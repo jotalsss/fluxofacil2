@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES_MAP } from '@/lib/constants';
@@ -29,8 +28,6 @@ import {
   ChartLegendContent,
   type ChartConfig
 } from "@/components/ui/chart";
-import { cn } from '@/lib/utils';
-
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -41,10 +38,26 @@ const months = [
   { value: "10", label: "Outubro" }, { value: "11", label: "Novembro" }, { value: "12", label: "Dezembro" }
 ];
 
+const getInitialFilterDate = () => {
+  const currentDate = new Date();
+  currentDate.setMonth(currentDate.getMonth() + 1); // Avança para o próximo mês
+  // Garante que o dia não cause problemas ao mudar de mês (ex: 31 de Jan + 1 mês não vira 3 de Mar)
+  // Para seleção de mês/ano, isso é menos crítico, mas é uma boa prática.
+  // getMonth() é 0-indexado, por isso +1
+  const nextMonth = currentDate.getMonth() + 1;
+  const yearForNextMonth = currentDate.getFullYear();
+  return {
+    month: String(nextMonth),
+    year: String(yearForNextMonth),
+  };
+};
+
+
 export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => (new Date().getMonth() + 1).toString());
-  const [selectedYear, setSelectedYear] = useState<string>(() => new Date().getFullYear().toString());
+  const initialDate = getInitialFilterDate();
+  const [selectedMonth, setSelectedMonth] = useState<string>(initialDate.month);
+  const [selectedYear, setSelectedYear] = useState<string>(initialDate.year);
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
@@ -53,7 +66,6 @@ export default function DashboardPage() {
   const [currentBalance, setCurrentBalance] = useState(0);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialFilterDone, setIsInitialFilterDone] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -92,7 +104,7 @@ export default function DashboardPage() {
     if (isClient && user) { 
       fetchAndSetTransactions();
     } else if (!user && isClient) {
-      setIsLoading(false); // No user, stop loading
+      setIsLoading(false); 
       setAllTransactions([]);
     }
   }, [isClient, user, fetchAndSetTransactions]);
@@ -131,17 +143,13 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    if (isClient && !isLoading && !isInitialFilterDone && (allTransactions.length > 0 || !user)) {
-      applyFiltersAndRecalculate();
-      setIsInitialFilterDone(true);
-    } else if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone && user) {
-      setFilteredTransactions([]);
-      setCurrentTotalIncome(0);
-      setCurrentTotalExpenses(0);
-      setCurrentBalance(0);
-      setIsInitialFilterDone(true);
+    // Filtra quando os dados são carregados ou quando os filtros (mês/ano) mudam
+    if (!isClient || isLoading) {
+      return; // Não faz nada se não for client-side ou se estiver carregando
     }
-  }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone, user]);
+    applyFiltersAndRecalculate();
+  }, [isClient, isLoading, allTransactions, selectedMonth, selectedYear, applyFiltersAndRecalculate]);
+
 
   useEffect(() => {
     if (filteredTransactions.length > 0) {
@@ -177,14 +185,6 @@ export default function DashboardPage() {
     }
   }, [filteredTransactions]);
 
-
-  const handleFilterButtonClick = () => {
-    if (isLoading && user) { 
-        toast({ title: "Aguarde", description: "Carregando transações..."});
-        return;
-    }
-    applyFiltersAndRecalculate();
-  };
 
   if (isLoading && isClient && user) { 
     return (
@@ -222,7 +222,6 @@ export default function DashboardPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleFilterButtonClick} className="shadow-md">Filtrar</Button>
         </div>
       </div>
 
@@ -321,8 +320,7 @@ export default function DashboardPage() {
                       <Cell key={`cell-${entry.id}`} fill={`var(--color-${entry.id})`} />
                     ))}
                   </Pie>
-                   {/* @ts-ignore TODO: Fix ChartLegendContent type or props */}
-                  <ChartLegend content={<ChartLegendContent nameKey="name"/>} />
+                  <ChartLegend content={<ChartLegendContent />} />
                 </RechartsPieChart>
               </ChartContainer>
             ) : (
@@ -339,3 +337,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
