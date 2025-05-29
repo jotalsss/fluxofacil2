@@ -1,5 +1,4 @@
 
-// @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
 import type { Transaction } from "@/lib/types";
@@ -25,9 +24,8 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
 
     const sortedTransactions = React.useMemo(() => {
         let sortableItems = [...transactions];
-        if (sortConfig !== null && sortConfig.key) { // Ensure sortConfig.key is not null
+        if (sortConfig !== null && sortConfig.key) { 
           sortableItems.sort((a, b) => {
-            // Handle undefined or null values for sorting keys safely
             const valA = a[sortConfig.key!];
             const valB = b[sortConfig.key!];
 
@@ -92,7 +90,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
             const CategoryIcon = categoryDetails?.icon;
             return (
               <TableRow key={transaction.id}>
-                <TableCell>{format(new Date(transaction.date), "MMMM/yyyy", { locale: ptBR })}</TableCell>
+                <TableCell>{format(transaction.date, "MMMM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="font-medium">{transaction.description}</TableCell>
                 <TableCell>
                   <div className="flex items-center">

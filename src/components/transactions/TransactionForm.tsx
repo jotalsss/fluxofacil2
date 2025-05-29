@@ -1,5 +1,4 @@
 
-// @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,10 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn }  from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import type { Transaction } from "@/lib/types";
-import { DEFAULT_CATEGORIES, CATEGORIES_MAP } from "@/lib/constants";
+import { DEFAULT_CATEGORIES } from "@/lib/constants";
 import React, { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,22 +49,20 @@ const transactionFormSchema = z.object({
   tags: z.string().optional(),
 });
 
-// This type is for the form's internal state
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
-// This is the type for the onSubmit prop, matching what TransactionsPage expects
-type SubmitHandlerData = Omit<Transaction, 'id' | 'date' | 'amount' > & { 
-    id?: string; // Optional for new transactions
-    amount: number; // Amount from form (always positive)
+type SubmitHandlerData = Omit<Transaction, 'id' | 'date' | 'amount' | 'userId' > & { 
+    id?: string; 
+    amount: number; 
     month: string; 
     year: string;
-    tags: string[]; // Processed tags
+    tags: string[]; 
 };
 
 
 interface TransactionFormProps {
   onSubmit: (data: SubmitHandlerData) => void;
-  initialData?: Partial<Transaction>; // Full transaction object passed here
+  initialData?: Transaction; 
   onClose: () => void;
 }
 
@@ -90,37 +86,28 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   });
 
   useEffect(() => {
-    if (initialData) {
-      form.reset({
-        month: String(initialData.date.getUTCMonth() + 1),
-        year: String(initialData.date.getUTCFullYear()),
-        description: initialData.description || "",
-        amount: initialData.amount ? Math.abs(initialData.amount) : 0,
-        type: initialData.type || "expense",
-        category: initialData.category || "",
-        tags: initialData.tags?.join(", ") || "",
-      });
-    } else {
-         form.reset({
-            month: String(new Date().getMonth() + 1),
-            year: String(new Date().getFullYear()),
-            description: "",
-            amount: 0,
-            type: "expense",
-            category: "",
-            tags: "",
-        });
-    }
+    const currentMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
+    const currentYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
+    
+    form.reset({
+        month: currentMonth,
+        year: currentYear,
+        description: initialData?.description || "",
+        amount: initialData?.amount ? Math.abs(initialData.amount) : 0,
+        type: initialData?.type || "expense",
+        category: initialData?.category || "",
+        tags: initialData?.tags?.join(", ") || "",
+    });
   }, [initialData, form]);
 
 
   const handleFormSubmit = (data: TransactionFormValues) => {
     const submitData: SubmitHandlerData = {
-      ...(initialData?.id && { id: initialData.id }), // Include ID if editing
+      ...(initialData?.id && { id: initialData.id }), 
       month: data.month,
       year: data.year,
       description: data.description,
-      amount: data.amount, // Amount is positive from form
+      amount: data.amount, 
       type: data.type,
       category: data.category,
       tags: data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(tag => tag) : [],
