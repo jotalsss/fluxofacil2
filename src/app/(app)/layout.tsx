@@ -1,12 +1,25 @@
 
-"use client"; // Required for usePathname
+"use client";
 
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import NextLink from 'next/link';
 import { APP_NAME } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, ListChecks } from "lucide-react";
-import NextLink from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Menu, LayoutDashboard, ListChecks, LogOut, UserCircle } from "lucide-react";
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { signOutUser } from '@/lib/firebase/authService';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
@@ -15,6 +28,36 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, loading } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, loading, router]);
+
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      toast({ title: "Logout realizado", description: "Você foi desconectado." });
+      router.push('/login');
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro no Logout", description: "Não foi possível fazer logout." });
+    }
+  };
+
+  if (loading || !isAuthenticated) {
+    // Você pode mostrar um loader aqui ou null, pois o useEffect fará o redirect
+    // Para evitar piscar a tela, pode-se mostrar um loader mais persistente ou
+    // o AuthProvider já mostra um loader global.
+    return (
+        <div className="flex justify-center items-center min-h-screen bg-background">
+            <Menu className="h-12 w-12 animate-spin text-primary" /> {/* Usando Menu como placeholder de loader */}
+        </div>
+    );
+  }
 
   return (
     <div className="flex min-h-svh w-full flex-col">
@@ -56,8 +99,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        <div className="w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))] sm:w-auto">
-          {/* User Menu, Notifications, etc. can go here, preserving some space on the right if needed */}
+        <div className="w-auto">
+          {isAuthenticated && user && (
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                   <UserCircle className="h-7 w-7" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.displayName || "Usuário"}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </header>
       <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background animate-in fade-in-0 slide-in-from-bottom-5 duration-500 ease-out">
