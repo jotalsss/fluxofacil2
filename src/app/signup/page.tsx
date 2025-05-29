@@ -22,7 +22,7 @@ export default function SignupPage() {
             Crie sua conta
           </h2>
           <p className="text-sm text-muted-foreground">
-            É rápido e fácil. Comece a organizar suas finanças hoje mesmo.
+            É rápido e fácil. Use um nome de usuário e senha.
           </p>
         </div>
         <SignupForm />

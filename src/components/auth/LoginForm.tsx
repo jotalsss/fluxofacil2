@@ -22,8 +22,8 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const loginFormSchema = z.object({
-  email: z.string().email("Por favor, insira um email válido."),
-  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
+  username: z.string().min(1, "Por favor, insira seu nome de usuário."),
+  password: z.string().min(1, "Por favor, insira sua senha."),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -36,7 +36,7 @@ export function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
@@ -44,14 +44,14 @@ export function LoginForm() {
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
     try {
-      await signInWithEmailPassword(data.email, data.password);
+      await signInWithEmailPassword(data.username, data.password);
       toast({ title: "Login bem-sucedido!", description: "Você será redirecionado." });
       router.push("/dashboard");
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Erro no login",
-        description: error.message || "Verifique suas credenciais e tente novamente.",
+        description: error.message || "Verifique seu usuário e senha e tente novamente.",
       });
     } finally {
       setIsLoading(false);
@@ -63,12 +63,12 @@ export function LoginForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="email"
+          name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Usuário</FormLabel>
               <FormControl>
-                <Input placeholder="seu@email.com" {...field} />
+                <Input placeholder="Seu nome de usuário" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

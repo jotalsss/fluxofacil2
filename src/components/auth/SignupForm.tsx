@@ -22,8 +22,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const signupFormSchema = z.object({
-  name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
-  email: z.string().email("Por favor, insira um email válido."),
+  username: z.string().min(3, "O nome de usuário deve ter pelo menos 3 caracteres."),
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
 });
 
@@ -37,8 +36,7 @@ export function SignupForm() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
-      name: "",
-      email: "",
+      username: "",
       password: "",
     },
   });
@@ -46,7 +44,7 @@ export function SignupForm() {
   async function onSubmit(data: SignupFormValues) {
     setIsLoading(true);
     try {
-      await signUpWithEmailPasswordName(data.name, data.email, data.password);
+      await signUpWithEmailPasswordName(data.username, data.password);
       toast({ title: "Cadastro realizado com sucesso!", description: "Você será redirecionado para o login." });
       router.push("/login");
     } catch (error: any) {
@@ -65,25 +63,12 @@ export function SignupForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="name"
+          name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nome Completo</FormLabel>
+              <FormLabel>Usuário</FormLabel>
               <FormControl>
-                <Input placeholder="Seu nome" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder="seu@email.com" {...field} />
+                <Input placeholder="Escolha um nome de usuário" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
