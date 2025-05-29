@@ -1,5 +1,7 @@
+
 "use client"; // Required for useState and event handlers if any
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, TrendingDown, List } from "lucide-react";
 import Image from "next/image";
@@ -9,13 +11,19 @@ const totalIncome = 5000;
 const totalExpenses = 2500;
 const balance = totalIncome - totalExpenses;
 
-const recentTransactions = [
+const staticRecentTransactions = [
   { id: '1', description: 'Salary Deposit', amount: 3000, type: 'income', date: '2024-07-25', category: 'Salary' },
   { id: '2', description: 'Groceries', amount: 75, type: 'expense', date: '2024-07-24', category: 'Groceries' },
   { id: '3', description: 'Netflix Subscription', amount: 15, type: 'expense', date: '2024-07-23', category: 'Entertainment' },
 ];
 
 export default function DashboardPage() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -62,18 +70,20 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {recentTransactions.map((transaction) => (
+              {staticRecentTransactions.map((transaction) => (
                 <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm">
                   <div>
                     <p className="font-medium">{transaction.description}</p>
-                    <p className="text-sm text-muted-foreground">{transaction.category} - {new Date(transaction.date).toLocaleDateString()}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {transaction.category} - {isClient ? new Date(transaction.date).toLocaleDateString() : '...'}
+                    </p>
                   </div>
                   <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                     {transaction.type === 'income' ? '+' : '-'}R${transaction.amount.toFixed(2)}
                   </p>
                 </li>
               ))}
-               {recentTransactions.length === 0 && (
+               {staticRecentTransactions.length === 0 && (
                 <p className="text-muted-foreground text-center py-4">No recent transactions.</p>
               )}
             </ul>
