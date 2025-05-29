@@ -26,11 +26,19 @@ export async function addTransaction(
     throw new Error("Usuário não autenticado.");
   }
 
-  const dataToSave = {
+  const dataToSave: any = { // any para flexibilidade durante a adição, mas os campos são do tipo Transaction
     ...transactionData,
     userId: user.uid, 
-    date: Timestamp.fromDate(transactionData.date),
+    date: Timestamp.fromDate(transactionData.date as Date), // Garante que transactionData.date seja tratado como Date
   };
+
+  // Adiciona campos de parcelamento apenas se existirem em transactionData
+  if (transactionData.isInstallment !== undefined) dataToSave.isInstallment = transactionData.isInstallment;
+  if (transactionData.installmentNumber !== undefined) dataToSave.installmentNumber = transactionData.installmentNumber;
+  if (transactionData.totalInstallments !== undefined) dataToSave.totalInstallments = transactionData.totalInstallments;
+  if (transactionData.originalPurchaseId !== undefined) dataToSave.originalPurchaseId = transactionData.originalPurchaseId;
+  if (transactionData.totalPurchaseAmount !== undefined) dataToSave.totalPurchaseAmount = transactionData.totalPurchaseAmount;
+
 
   try {
     const docRef = await addDoc(collection(db, TRANSACTIONS_COLLECTION), dataToSave);
@@ -76,14 +84,21 @@ export async function getTransactions(): Promise<Transaction[]> {
     });
     return transactions;
   } catch (e: any) {
-    console.error("Erro detalhado ao buscar transações: ", e); // Log do erro original completo
-    let detailedMessage = "Não foi possível buscar as transações.";
-    if (e.code === 'failed-precondition' && e.message && e.message.includes('Query requires an index')) {
-        detailedMessage = "Índice do Firestore ausente ou ainda sendo criado. Por favor, verifique no console do Firebase se o índice para 'transactions' com campos 'userId (asc)', 'date (desc)', 'description (asc)' está ativo. Pode levar alguns minutos para o índice ser construído.";
-    } else if (e.message) {
-        detailedMessage += ` Detalhe: ${e.message}`; 
+    console.error("Erro detalhado ao buscar transações: ", e);
+    let errorMessage = "Não foi possível buscar as transações.";
+    if (e.code === 'failed-precondition' && e.message?.includes('Query requires an index')) {
+      errorMessage = "Índice do Firestore ausente ou ainda sendo criado. Por favor, verifique no console do Firebase se o índice para 'transactions' com campos 'userId (asc)', 'date (desc)', 'description (asc)' está ativo. Pode levar alguns minutos para o índice ser construído.";
+    } else {
+      let details = [];
+      if (e.code) details.push(`Código: ${e.code}`);
+      if (e.message) details.push(`Mensagem: ${e.message}`);
+      if (details.length > 0) {
+        errorMessage += ` Detalhes: ${details.join('; ')}`;
+      } else if (typeof e.toString === 'function') {
+        errorMessage += ` Detalhe: ${e.toString()}`;
+      }
     }
-    throw new Error(detailedMessage);
+    throw new Error(errorMessage);
   }
 }
 
@@ -100,7 +115,7 @@ export async function updateTransaction(
   try {
     const transactionDoc = doc(db, TRANSACTIONS_COLLECTION, id);
     
-    const dataToUpdate: PartialWithFieldValue<Transaction> = { ...transactionData };
+    const dataToUpdate: PartialWithFieldValue<Transaction> = { ...transactionData } as PartialWithFieldValue<Transaction>;
     if (transactionData.date) {
       dataToUpdate.date = Timestamp.fromDate(transactionData.date);
     }
@@ -131,3 +146,4 @@ export async function deleteTransaction(id: string): Promise<void> {
     throw new Error(`Não foi possível deletar a transação. Detalhe: ${e.message}`);
   }
 }
+
