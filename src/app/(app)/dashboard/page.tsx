@@ -1,0 +1,102 @@
+"use client"; // Required for useState and event handlers if any
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DollarSign, TrendingUp, TrendingDown, List } from "lucide-react";
+import Image from "next/image";
+
+// Dummy data for now
+const totalIncome = 5000;
+const totalExpenses = 2500;
+const balance = totalIncome - totalExpenses;
+
+const recentTransactions = [
+  { id: '1', description: 'Salary Deposit', amount: 3000, type: 'income', date: '2024-07-25', category: 'Salary' },
+  { id: '2', description: 'Groceries', amount: 75, type: 'expense', date: '2024-07-24', category: 'Groceries' },
+  { id: '3', description: 'Netflix Subscription', amount: 15, type: 'expense', date: '2024-07-23', category: 'Entertainment' },
+];
+
+export default function DashboardPage() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+            <TrendingUp className="h-5 w-5 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">R${totalIncome.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">+10% from last month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <TrendingDown className="h-5 w-5 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">R${totalExpenses.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">+5% from last month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Balance</CardTitle>
+            <DollarSign className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">R${balance.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Current account balance</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <List className="h-5 w-5 mr-2 text-primary" />
+              Recent Transactions
+            </CardTitle>
+            <CardDescription>Last few transactions recorded.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {recentTransactions.map((transaction) => (
+                <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm">
+                  <div>
+                    <p className="font-medium">{transaction.description}</p>
+                    <p className="text-sm text-muted-foreground">{transaction.category} - {new Date(transaction.date).toLocaleDateString()}</p>
+                  </div>
+                  <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    {transaction.type === 'income' ? '+' : '-'}R${transaction.amount.toFixed(2)}
+                  </p>
+                </li>
+              ))}
+               {recentTransactions.length === 0 && (
+                <p className="text-muted-foreground text-center py-4">No recent transactions.</p>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col items-center justify-center">
+          <CardHeader>
+            <CardTitle>Spending Overview</CardTitle>
+            <CardDescription>Visual representation of your spending habits.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex items-center justify-center w-full">
+             <Image 
+                src="https://placehold.co/600x400.png" 
+                alt="Placeholder chart for spending overview"
+                width={600}
+                height={400}
+                data-ai-hint="finance chart"
+                className="rounded-md object-cover"
+              />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
