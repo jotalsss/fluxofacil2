@@ -1,14 +1,20 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface Transaction {
   id: string;
-  userId: string; // Adicionado para associar a transação ao usuário
-  date: Date;
+  userId: string; 
+  date: Date; // Data da parcela específica ou da transação única
   description: string;
-  amount: number;
+  amount: number; // Para parcelas, este será o valor da parcela.
   type: 'income' | 'expense';
-  category: string; // Category name
+  category: string; 
   tags: string[];
+  isInstallment?: boolean; // É uma parcela?
+  installmentNumber?: number; // Número da parcela atual (ex: 1, 2, 3)
+  totalInstallments?: number; // Número total de parcelas
+  originalPurchaseId?: string; // ID para agrupar todas as parcelas de uma compra
+  totalPurchaseAmount?: number; // Valor total da compra original parcelada
 }
 
 export interface Category {

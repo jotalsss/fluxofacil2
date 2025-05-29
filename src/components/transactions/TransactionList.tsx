@@ -7,10 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit2, Trash2, PlusCircle, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Edit2, Trash2, PlusCircle, ArrowUpDown, Info } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from 'date-fns/locale';
 import React from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -72,6 +78,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
   }
 
   return (
+    <TooltipProvider>
     <div className="rounded-md border shadow-sm bg-card">
       <Table>
         <TableHeader>
@@ -88,10 +95,28 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
           {sortedTransactions.map((transaction) => {
             const categoryDetails = CATEGORIES_MAP.get(transaction.category);
             const CategoryIcon = categoryDetails?.icon;
+            
+            // Descrição já vem formatada do firestoreService para parcelas
+            const displayDescription = transaction.description;
+
             return (
               <TableRow key={transaction.id}>
                 <TableCell>{format(transaction.date, "MMMM/yyyy", { locale: ptBR })}</TableCell>
-                <TableCell className="font-medium">{transaction.description}</TableCell>
+                <TableCell className="font-medium">
+                  {displayDescription}
+                  {transaction.isInstallment && transaction.totalPurchaseAmount && (
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <button type="button" tabIndex={-1} className="align-middle">
+                            <Info className="ml-1 h-3 w-3 text-muted-foreground inline-block cursor-help" />
+                         </button>
+                       </TooltipTrigger>
+                       <TooltipContent side="top">
+                         <p>Valor total da compra original: R$ {transaction.totalPurchaseAmount.toFixed(2)}</p>
+                       </TooltipContent>
+                     </Tooltip>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center">
                     {CategoryIcon && <CategoryIcon className="mr-2 h-4 w-4 text-muted-foreground" />}
@@ -117,11 +142,11 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(transaction)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Editar
+                      <DropdownMenuItem onClick={() => onEdit(transaction)} disabled={transaction.isInstallment}>
+                        <Edit2 className="mr-2 h-4 w-4" /> {transaction.isInstallment ? "Editar (Limitado)" : "Editar"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onDelete(transaction.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {transaction.isInstallment ? "Parcela" : ""}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -132,5 +157,6 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
         </TableBody>
       </Table>
     </div>
+    </TooltipProvider>
   );
 }

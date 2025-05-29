@@ -22,14 +22,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CalendarIcon, Info, Loader2 } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_CATEGORIES } from "@/lib/constants";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const currentFullYear = new Date().getFullYear();
-const years = Array.from({ length: 10 }, (_, i) => currentFullYear - 5 + i); // 5 anos passados e 5 futuros
+const years = Array.from({ length: 10 }, (_, i) => currentFullYear - 5 + i); 
 const months = [
   { value: "1", label: "Janeiro" }, { value: "2", label: "Fevereiro" }, { value: "3", label: "Março" },
   { value: "4", label: "Abril" }, { value: "5", label: "Maio" }, { value: "6", label: "Junho" },
@@ -47,27 +55,49 @@ const transactionFormSchema = z.object({
   }),
   category: z.string().min(1, "A categoria é obrigatória."),
   tags: z.string().optional(),
+  isInstallmentPurchase: z.boolean().default(false).optional(),
+  numberOfInstallments: z.coerce.number().optional(), // Removido min(2) daqui, validado no refine
+}).refine(data => {
+  if (data.isInstallmentPurchase && data.type === 'expense') {
+    return !!data.numberOfInstallments && data.numberOfInstallments >= 2;
+  }
+  return true;
+}, {
+  message: "Número de parcelas é obrigatório para compra parcelada (despesa) e deve ser no mínimo 2.",
+  path: ["numberOfInstallments"],
+}).refine(data => {
+    if (data.isInstallmentPurchase && data.type === 'income') {
+        return false; // Não permitir parcelamento para receitas
+    }
+    return true;
+}, {
+    message: "Não é possível parcelar receitas.",
+    path: ["isInstallmentPurchase"],
 });
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
-type SubmitHandlerData = Omit<Transaction, 'id' | 'date' | 'amount' | 'userId' > & { 
+export type TransactionFormSubmitData = Omit<Transaction, 'id' | 'date' | 'userId' | 'amount' | 'isInstallment' | 'installmentNumber' | 'totalInstallments' | 'originalPurchaseId' | 'totalPurchaseAmount'> & { 
     id?: string; 
     amount: number; 
     month: string; 
     year: string;
     tags: string[]; 
+    isInstallmentPurchase?: boolean;
+    numberOfInstallments?: number;
 };
 
 
 interface TransactionFormProps {
-  onSubmit: (data: SubmitHandlerData) => void;
+  onSubmit: (data: TransactionFormSubmitData) => Promise<void>; // Alterado para Promise<void>
   initialData?: Transaction; 
   onClose: () => void;
 }
 
 export function TransactionForm({ onSubmit, initialData, onClose }: TransactionFormProps) {
   const { toast } = useToast();
+  const [calculatedInstallmentAmount, setCalculatedInstallmentAmount] = useState<number | null>(null);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 
   const defaultMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
   const defaultYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
@@ -78,31 +108,54 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       month: defaultMonth,
       year: defaultYear,
       description: initialData?.description || "",
-      amount: initialData?.amount ? Math.abs(initialData.amount) : 0,
+      amount: initialData?.isInstallment && initialData?.totalPurchaseAmount 
+                ? Math.abs(initialData.totalPurchaseAmount)
+                : (initialData?.amount ? Math.abs(initialData.amount) : undefined),
       type: initialData?.type || "expense",
       category: initialData?.category || "",
       tags: initialData?.tags?.join(", ") || "",
+      isInstallmentPurchase: initialData?.isInstallment || false,
+      numberOfInstallments: initialData?.totalInstallments || undefined,
     },
   });
 
+  const watchIsInstallmentPurchase = form.watch("isInstallmentPurchase");
+  const watchAmount = form.watch("amount");
+  const watchNumberOfInstallments = form.watch("numberOfInstallments");
+  const watchType = form.watch("type");
+
   useEffect(() => {
+    if (watchIsInstallmentPurchase && watchType === 'expense' && watchAmount > 0 && watchNumberOfInstallments && watchNumberOfInstallments >= 2) {
+      setCalculatedInstallmentAmount(watchAmount / watchNumberOfInstallments);
+    } else {
+      setCalculatedInstallmentAmount(null);
+    }
+  }, [watchIsInstallmentPurchase, watchAmount, watchNumberOfInstallments, watchType]);
+  
+  useEffect(() => {
+    const isEditingInstallment = !!initialData?.isInstallment;
     const currentMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
     const currentYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
-    
+
     form.reset({
         month: currentMonth,
         year: currentYear,
-        description: initialData?.description || "",
-        amount: initialData?.amount ? Math.abs(initialData.amount) : 0,
+        description: isEditingInstallment ? initialData.description.replace(/ \(Parcela \d+\/\d+\)$/, '') : initialData?.description || "",
+        amount: isEditingInstallment && initialData?.totalPurchaseAmount
+                ? Math.abs(initialData.totalPurchaseAmount)
+                : (initialData?.amount ? Math.abs(initialData.amount) : undefined),
         type: initialData?.type || "expense",
         category: initialData?.category || "",
         tags: initialData?.tags?.join(", ") || "",
+        isInstallmentPurchase: isEditingInstallment,
+        numberOfInstallments: isEditingInstallment ? initialData.totalInstallments : undefined,
     });
   }, [initialData, form]);
 
 
-  const handleFormSubmit = (data: TransactionFormValues) => {
-    const submitData: SubmitHandlerData = {
+  const handleFormSubmit = async (data: TransactionFormValues) => {
+    setIsSubmittingForm(true);
+    const submitData: TransactionFormSubmitData = {
       ...(initialData?.id && { id: initialData.id }), 
       month: data.month,
       year: data.year,
@@ -111,23 +164,73 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       type: data.type,
       category: data.category,
       tags: data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(tag => tag) : [],
+      isInstallmentPurchase: data.isInstallmentPurchase && data.type === 'expense', // Parcelamento só para despesas
+      numberOfInstallments: (data.isInstallmentPurchase && data.type === 'expense') ? data.numberOfInstallments : undefined,
     };
-    onSubmit(submitData);
-    toast({ title: "Transação salva!", description: `Transação "${data.description}" foi salva.` });
-    onClose();
+    try {
+        await onSubmit(submitData); // onSubmit agora é async
+        // Toast é tratado na página pai agora
+        onClose();
+    } catch (error) {
+        // Erro já tratado na página pai
+        console.error("Erro no formulário:", error);
+    } finally {
+        setIsSubmittingForm(false);
+    }
   };
 
+  const isEditingThisInstallment = !!initialData?.isInstallment;
+
   return (
+    <TooltipProvider>
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 p-1">
+        <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem className="space-y-3">
+                <FormLabel>Tipo de Transação</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value === 'income') { 
+                        form.setValue("isInstallmentPurchase", false);
+                        form.setValue("numberOfInstallments", undefined);
+                      }
+                    }}
+                    value={field.value}
+                    className="flex space-x-4"
+                    disabled={isEditingThisInstallment}
+                  >
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="income" />
+                      </FormControl>
+                      <FormLabel className={cn("font-normal", isEditingThisInstallment && "text-muted-foreground")}>Receita</FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="expense" />
+                      </FormControl>
+                      <FormLabel className={cn("font-normal", isEditingThisInstallment && "text-muted-foreground")}>Despesa</FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
         <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="month"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mês</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                  <FormLabel>Mês Início/Pagamento</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment}>
                     <FormControl>
                       <SelectTrigger>
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
@@ -149,8 +252,8 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
               name="year"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ano</FormLabel>
-                   <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                  <FormLabel>Ano Início/Pagamento</FormLabel>
+                   <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment}>
                     <FormControl>
                       <SelectTrigger>
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
@@ -169,7 +272,6 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             />
         </div>
         
-
         <FormField
           control={form.control}
           name="description"
@@ -177,58 +279,85 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Input placeholder="ex: Café com amigos" {...field} />
+                <Input placeholder="ex: Compra de Geladeira, Salário" {...field} disabled={isEditingThisInstallment} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
-        <div className="grid grid-cols-2 gap-4">
+        
+        {watchType === 'expense' && (
+        <FormField
+          control={form.control}
+          name="isInstallmentPurchase"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (!checked) {
+                      form.setValue("numberOfInstallments", undefined);
+                      setCalculatedInstallmentAmount(null);
+                    }
+                  }}
+                  disabled={isEditingThisInstallment}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel className={cn(isEditingThisInstallment && "text-muted-foreground")}>
+                  É uma compra parcelada?
+                </FormLabel>
+                {isEditingThisInstallment && <p className="text-xs text-muted-foreground">Não é possível alterar o parcelamento de uma transação existente através da edição de uma parcela.</p>}
+              </div>
+            </FormItem>
+          )}
+        />)}
+        
+        {watchIsInstallmentPurchase && watchType === 'expense' && !isEditingThisInstallment && (
           <FormField
+            control={form.control}
+            name="numberOfInstallments"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Número de Parcelas</FormLabel>
+                <FormControl>
+                  <Input type="number" placeholder="Ex: 12" {...field} min="2" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <FormField
             control={form.control}
             name="amount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Valor (R$)</FormLabel>
+                <FormLabel className="flex items-center">
+                  {watchIsInstallmentPurchase && watchType === 'expense' ? "Valor Total da Compra (R$)" : "Valor (R$)"}
+                   {watchIsInstallmentPurchase && watchType === 'expense' && (
+                     <Tooltip>
+                       <TooltipTrigger asChild><button type="button" tabIndex={-1}><Info className="ml-1 h-3 w-3 text-muted-foreground cursor-help" /></button></TooltipTrigger>
+                       <TooltipContent side="top"><p>Informe o valor total da compra. As parcelas serão calculadas.</p></TooltipContent>
+                     </Tooltip>
+                   )}
+                </FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  <Input type="number" step="0.01" placeholder="0.00" {...field} disabled={isEditingThisInstallment} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo</FormLabel>
-                <FormControl>
-                  <RadioGroup
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    className="flex space-x-4 pt-2"
-                  >
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="income" />
-                      </FormControl>
-                      <FormLabel className="font-normal">Receita</FormLabel>
-                    </FormItem>
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="expense" />
-                      </FormControl>
-                      <FormLabel className="font-normal">Despesa</FormLabel>
-                    </FormItem>
-                  </RadioGroup>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        
+         {watchIsInstallmentPurchase && calculatedInstallmentAmount !== null && watchType === 'expense' && !isEditingThisInstallment && (
+          <div className="mt-2 text-sm text-muted-foreground bg-secondary p-2 rounded-md">
+            Valor de cada parcela: R$ {calculatedInstallmentAmount.toFixed(2)} (aproximadamente)
+          </div>
+        )}
 
         <FormField
           control={form.control}
@@ -237,7 +366,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Categoria</FormLabel>
               <div className="flex items-center gap-2">
-                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -267,7 +396,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Tags (separadas por vírgula)</FormLabel>
               <FormControl>
-                <Input placeholder="ex: trabalho, pessoal, importante" {...field} />
+                <Input placeholder="ex: urgente, viagem, casa" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -275,10 +404,15 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
         />
 
         <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit">Salvar Transação</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmittingForm}>Cancelar</Button>
+            <Button type="submit" disabled={isSubmittingForm || (isEditingThisInstallment && !initialData?.id) }>
+              {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditingThisInstallment ? "Salvar Parcela (Limitado)" : (initialData?.id ? "Salvar Alterações" : "Salvar Transação")}
+            </Button>
         </div>
+        {isEditingThisInstallment && <p className="text-sm text-muted-foreground text-right pt-2">Edição de parcelas individuais é limitada. Para alterar detalhes da compra original (valor total, nº de parcelas), exclua todas as parcelas e adicione a compra novamente.</p>}
       </form>
     </Form>
+    </TooltipProvider>
   );
 }
