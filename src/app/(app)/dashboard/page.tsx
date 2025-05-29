@@ -19,16 +19,16 @@ import { CATEGORIES_MAP } from '@/lib/constants';
 
 // Expanded dummy data for filtering
 const ALL_TRANSACTIONS_DATA = [
-  { id: 't1', description: 'Salário Julho', amount: 5000, type: 'income', date: '2023-07-25', category: 'salary', tags: ['trabalho'] },
-  { id: 't2', description: 'Supermercado QLP', amount: 150, type: 'expense', date: '2023-07-24', category: 'groceries', tags: ['comida'] },
-  { id: 't3', description: 'Assinatura Streaming', amount: 45, type: 'expense', date: '2023-07-23', category: 'entertainment', tags: ['lazer'] },
-  { id: 't4', description: 'Aluguel Maio', amount: 1200, type: 'expense', date: '2023-05-05', category: 'housing', tags: ['moradia'] },
+  { id: 't1', description: 'Salário Julho', amount: 5000, type: 'income', date: '2023-07-01', category: 'salary', tags: ['trabalho'] },
+  { id: 't2', description: 'Supermercado QLP', amount: 150, type: 'expense', date: '2023-07-01', category: 'groceries', tags: ['comida'] },
+  { id: 't3', description: 'Assinatura Streaming', amount: 45, type: 'expense', date: '2023-07-01', category: 'entertainment', tags: ['lazer'] },
+  { id: 't4', description: 'Aluguel Maio', amount: 1200, type: 'expense', date: '2023-05-01', category: 'housing', tags: ['moradia'] },
   { id: 't5', description: 'Salário Maio', amount: 5200, type: 'income', date: '2023-05-01', category: 'salary', tags: ['trabalho'] },
-  { id: 't6', description: 'Restaurante Jan', amount: 180, type: 'expense', date: '2024-01-10', category: 'food_dining', tags: ['lazer', 'jantar'] },
-  { id: 't7', description: 'Freelance Jan', amount: 800, type: 'income', date: '2024-01-12', category: 'salary', tags: ['trabalho', 'freela'] },
-  { id: 't8', description: 'Conta de Luz Julho', amount: 120, type: 'expense', date: '2023-07-15', category: 'utilities', tags: ['casa'] },
-  { id: 't9', description: 'Presente Aniversário Maio', amount: 100, type: 'expense', date: '2023-05-20', category: 'gifts', tags: ['social'] },
-  { id: 't10', description: 'Investimento Jan', amount: 500, type: 'expense', date: '2024-01-05', category: 'investments', tags: ['finanças'] },
+  { id: 't6', description: 'Restaurante Jan', amount: 180, type: 'expense', date: '2024-01-01', category: 'food_dining', tags: ['lazer', 'jantar'] },
+  { id: 't7', description: 'Freelance Jan', amount: 800, type: 'income', date: '2024-01-01', category: 'salary', tags: ['trabalho', 'freela'] },
+  { id: 't8', description: 'Conta de Luz Julho', amount: 120, type: 'expense', date: '2023-07-01', category: 'utilities', tags: ['casa'] },
+  { id: 't9', description: 'Presente Aniversário Maio', amount: 100, type: 'expense', date: '2023-05-01', category: 'gifts', tags: ['social'] },
+  { id: 't10', description: 'Investimento Jan', amount: 500, type: 'expense', date: '2024-01-01', category: 'investments', tags: ['finanças'] },
 ];
 
 const currentYear = new Date().getFullYear();
@@ -73,7 +73,9 @@ export default function DashboardPage() {
     const yearToFilter = parseInt(selectedYear, 10);
 
     const newFilteredTransactions = allTransactions.filter(transaction => {
-      return transaction.date.getUTCMonth() + 1 === monthToFilter && transaction.date.getUTCFullYear() === yearToFilter;
+      // Ensure date is a Date object
+      const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
+      return transactionDate.getUTCMonth() + 1 === monthToFilter && transactionDate.getUTCFullYear() === yearToFilter;
     });
 
     setFilteredTransactions(newFilteredTransactions);
@@ -180,12 +182,13 @@ export default function DashboardPage() {
               {filteredTransactions.length > 0 ? filteredTransactions.map((transaction) => {
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const CategoryIcon = categoryDetails?.icon;
+                const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
                 return (
                 <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
                   <div>
                     <p className="font-medium">{transaction.description}</p>
                     <p className="text-sm text-muted-foreground">
-                      {categoryDetails?.name || transaction.category} - {isClient ? format(transaction.date, 'dd/MM/yyyy', { locale: ptBR }) : '...'}
+                      {categoryDetails?.name || transaction.category} - {isClient ? format(transactionDate, 'MMMM/yyyy', { locale: ptBR }) : '...'}
                     </p>
                   </div>
                   <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>

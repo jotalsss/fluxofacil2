@@ -78,7 +78,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Data {getSortIndicator('date')}</TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Mês/Ano {getSortIndicator('date')}</TableHead>
             <TableHead className="cursor-pointer" onClick={() => requestSort('description')}>Descrição {getSortIndicator('description')}</TableHead>
             <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Categoria {getSortIndicator('category')}</TableHead>
             <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Valor (R$) {getSortIndicator('amount')}</TableHead>
@@ -92,7 +92,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
             const CategoryIcon = categoryDetails?.icon;
             return (
               <TableRow key={transaction.id}>
-                <TableCell>{format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                <TableCell>{format(new Date(transaction.date), "MMMM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="font-medium">{transaction.description}</TableCell>
                 <TableCell>
                   <div className="flex items-center">
