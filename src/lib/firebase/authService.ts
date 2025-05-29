@@ -22,7 +22,10 @@ export async function signUpWithEmailPasswordName(username: string, password: st
     if (error.code === 'auth/email-already-in-use') {
       throw new Error("Este nome de usuário já está em uso.");
     }
-    throw new Error(error.message || "Não foi possível criar a conta.");
+    if (error.code === 'auth/operation-not-allowed') {
+      throw new Error("Cadastro com nome de usuário e senha não está habilitado. Verifique as configurações do Firebase Authentication no console do Firebase.");
+    }
+    throw new Error(error.message || "Não foi possível criar a conta. Verifique os dados e tente novamente.");
   }
 }
 
@@ -36,7 +39,10 @@ export async function signInWithEmailPassword(username: string, password: string
     if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
       throw new Error("Usuário ou senha inválidos.");
     }
-    throw new Error(error.message || "Usuário ou senha inválidos.");
+    if (error.code === 'auth/operation-not-allowed') {
+      throw new Error("Login com nome de usuário e senha não está habilitado. Verifique as configurações do Firebase Authentication no console do Firebase.");
+    }
+    throw new Error(error.message || "Usuário ou senha inválidos. Tente novamente.");
   }
 }
 
