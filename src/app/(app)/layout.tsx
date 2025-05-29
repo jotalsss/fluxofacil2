@@ -9,8 +9,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/transactions', label: 'Transactions', icon: ListChecks },
+  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { href: '/transactions', label: 'Transações', icon: ListChecks },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -44,7 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       isActive
                         ? "bg-primary/10 text-primary shadow-sm"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      "duration-300 ease-in-out" // Added for smoother transition on hover
+                      "duration-300 ease-in-out"
                     )}
                   >
                     <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground group-hover:text-accent-foreground", "sm:mr-2")} />

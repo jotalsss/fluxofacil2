@@ -1,3 +1,4 @@
+
 // @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
@@ -31,6 +32,7 @@ import {
 import { cn }  from "@/lib/utils";
 import { CalendarIcon, Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { ptBR } from 'date-fns/locale';
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_CATEGORIES, CATEGORIES_MAP } from "@/lib/constants";
 import { suggestTransactionCategory } from "@/ai/flows/suggest-transaction-category";
@@ -39,14 +41,14 @@ import { useToast } from "@/hooks/use-toast";
 
 const transactionFormSchema = z.object({
   date: z.date({
-    required_error: "Date is required.",
+    required_error: "A data é obrigatória.",
   }),
-  description: z.string().min(1, "Description is required."),
-  amount: z.coerce.number().positive("Amount must be positive."),
+  description: z.string().min(1, "A descrição é obrigatória."),
+  amount: z.coerce.number().positive("O valor deve ser positivo."),
   type: z.enum(["income", "expense"], {
-    required_error: "Transaction type is required.",
+    required_error: "O tipo da transação é obrigatório.",
   }),
-  category: z.string().min(1, "Category is required."),
+  category: z.string().min(1, "A categoria é obrigatória."),
   tags: z.string().optional(),
 });
 
@@ -79,18 +81,18 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
     const transactionData: Transaction = {
       id: initialData?.id || crypto.randomUUID(),
       ...data,
-      amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount), // Store expenses as negative
+      amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
       tags: data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(tag => tag) : [],
     };
     onSubmit(transactionData);
-    toast({ title: "Transaction saved!", description: `Transaction "${data.description}" has been saved.` });
+    toast({ title: "Transação salva!", description: `Transação "${data.description}" foi salva.` });
     onClose();
   };
 
   const handleSuggestCategory = async () => {
     const description = form.getValues("description");
     if (!description) {
-      toast({ title: "Suggestion Failed", description: "Please enter a description first.", variant: "destructive" });
+      toast({ title: "Falha na Sugestão", description: "Por favor, insira uma descrição primeiro.", variant: "destructive" });
       return;
     }
     setIsSuggestingCategory(true);
@@ -98,17 +100,17 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
     try {
       const result = await suggestTransactionCategory({ transactionDescription: description });
       if (result.suggestedCategory) {
-        const validCategory = DEFAULT_CATEGORIES.find(cat => cat.name.toLowerCase() === result.suggestedCategory.toLowerCase());
+        const validCategory = DEFAULT_CATEGORIES.find(cat => cat.name.toLowerCase() === result.suggestedCategory.toLowerCase() || cat.id.toLowerCase() === result.suggestedCategory.toLowerCase());
         if (validCategory) {
-            setSuggestedCategory(validCategory.id); // Store ID for Select value
-            toast({ title: "AI Suggestion", description: `Suggested category: ${validCategory.name} (Confidence: ${Math.round(result.confidence * 100)}%)` });
+            setSuggestedCategory(validCategory.id); 
+            toast({ title: "Sugestão da IA", description: `Categoria sugerida: ${validCategory.name} (Confiança: ${Math.round(result.confidence * 100)}%)` });
         } else {
-            toast({ title: "AI Suggestion", description: `Suggested: ${result.suggestedCategory}. Not in predefined list.`, variant: "default" });
+            toast({ title: "Sugestão da IA", description: `Sugerido: ${result.suggestedCategory}. Não está na lista predefinida.`, variant: "default" });
         }
       }
     } catch (error) {
-      console.error("Error suggesting category:", error);
-      toast({ title: "Suggestion Failed", description: "Could not get AI suggestion.", variant: "destructive" });
+      console.error("Erro ao sugerir categoria:", error);
+      toast({ title: "Falha na Sugestão", description: "Não foi possível obter a sugestão da IA.", variant: "destructive" });
     } finally {
       setIsSuggestingCategory(false);
     }
@@ -117,7 +119,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   const applySuggestedCategory = () => {
     if (suggestedCategory) {
       form.setValue("category", suggestedCategory, { shouldValidate: true });
-      setSuggestedCategory(null); // Clear suggestion after applying
+      setSuggestedCategory(null); 
     }
   };
 
@@ -129,7 +131,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
           name="date"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Date</FormLabel>
+              <FormLabel>Data</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -141,9 +143,9 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                       )}
                     >
                       {field.value ? (
-                        format(field.value, "PPP")
+                        format(field.value, "PPP", { locale: ptBR })
                       ) : (
-                        <span>Pick a date</span>
+                        <span>Escolha uma data</span>
                       )}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
@@ -158,6 +160,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                       date > new Date() || date < new Date("1900-01-01")
                     }
                     initialFocus
+                    locale={ptBR}
                   />
                 </PopoverContent>
               </Popover>
@@ -171,9 +174,9 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., Coffee with friends" {...field} />
+                <Input placeholder="ex: Café com amigos" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -186,7 +189,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             name="amount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Amount (R$)</FormLabel>
+                <FormLabel>Valor (R$)</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" placeholder="0.00" {...field} />
                 </FormControl>
@@ -199,7 +202,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             name="type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Type</FormLabel>
+                <FormLabel>Tipo</FormLabel>
                 <FormControl>
                   <RadioGroup
                     onValueChange={field.onChange}
@@ -210,13 +213,13 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                       <FormControl>
                         <RadioGroupItem value="income" />
                       </FormControl>
-                      <FormLabel className="font-normal">Income</FormLabel>
+                      <FormLabel className="font-normal">Receita</FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
                         <RadioGroupItem value="expense" />
                       </FormControl>
-                      <FormLabel className="font-normal">Expense</FormLabel>
+                      <FormLabel className="font-normal">Despesa</FormLabel>
                     </FormItem>
                   </RadioGroup>
                 </FormControl>
@@ -231,12 +234,12 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
           name="category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Category</FormLabel>
+              <FormLabel>Categoria</FormLabel>
               <div className="flex items-center gap-2">
                 <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -250,13 +253,13 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" size="icon" onClick={handleSuggestCategory} disabled={isSuggestingCategory} aria-label="Suggest Category">
+                <Button type="button" variant="outline" size="icon" onClick={handleSuggestCategory} disabled={isSuggestingCategory} aria-label="Sugerir Categoria">
                   {isSuggestingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 </Button>
               </div>
               {suggestedCategory && CATEGORIES_MAP.has(suggestedCategory) && (
                  <div className="mt-2 text-sm text-muted-foreground">
-                    AI Suggests: <Button variant="link" className="p-0 h-auto" onClick={applySuggestedCategory}>{CATEGORIES_MAP.get(suggestedCategory)?.name}</Button>
+                    IA Sugere: <Button variant="link" className="p-0 h-auto" onClick={applySuggestedCategory}>{CATEGORIES_MAP.get(suggestedCategory)?.name}</Button>
                  </div>
               )}
               <FormMessage />
@@ -269,9 +272,9 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
           name="tags"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tags (comma-separated)</FormLabel>
+              <FormLabel>Tags (separadas por vírgula)</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., work, personal, important" {...field} />
+                <Input placeholder="ex: trabalho, pessoal, importante" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -279,8 +282,8 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
         />
 
         <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit">Save Transaction</Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit">Salvar Transação</Button>
         </div>
       </form>
     </Form>

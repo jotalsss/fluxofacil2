@@ -1,3 +1,4 @@
+
 // @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit2, Trash2, PlusCircle, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
+import { ptBR } from 'date-fns/locale';
 import React from "react";
 
 interface TransactionListProps {
@@ -23,16 +25,23 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
 
     const sortedTransactions = React.useMemo(() => {
         let sortableItems = [...transactions];
-        if (sortConfig !== null) {
-        sortableItems.sort((a, b) => {
-            if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (sortConfig !== null && sortConfig.key) { // Ensure sortConfig.key is not null
+          sortableItems.sort((a, b) => {
+            // Handle undefined or null values for sorting keys safely
+            const valA = a[sortConfig.key!];
+            const valB = b[sortConfig.key!];
+
+            if (valA === null || valA === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
+            if (valB === null || valB === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
+            
+            if (valA < valB) {
+              return sortConfig.direction === 'ascending' ? -1 : 1;
             }
-            if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? 1 : -1;
+            if (valA > valB) {
+              return sortConfig.direction === 'ascending' ? 1 : -1;
             }
             return 0;
-        });
+          });
         }
         return sortableItems;
     }, [transactions, sortConfig]);
@@ -55,10 +64,10 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10">
-        <h3 className="text-xl font-semibold mb-2">No transactions yet.</h3>
-        <p className="text-muted-foreground mb-4">Start by adding your first transaction.</p>
+        <h3 className="text-xl font-semibold mb-2">Nenhuma transação ainda.</h3>
+        <p className="text-muted-foreground mb-4">Comece adicionando sua primeira transação.</p>
         <Button onClick={onAddTransaction}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Transaction
+          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Transação
         </Button>
       </div>
     );
@@ -69,12 +78,12 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date {getSortIndicator('date')}</TableHead>
-            <TableHead className="cursor-pointer" onClick={() => requestSort('description')}>Description {getSortIndicator('description')}</TableHead>
-            <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</TableHead>
-            <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount (R$) {getSortIndicator('amount')}</TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Data {getSortIndicator('date')}</TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('description')}>Descrição {getSortIndicator('description')}</TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Categoria {getSortIndicator('category')}</TableHead>
+            <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Valor (R$) {getSortIndicator('amount')}</TableHead>
             <TableHead>Tags</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -83,7 +92,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
             const CategoryIcon = categoryDetails?.icon;
             return (
               <TableRow key={transaction.id}>
-                <TableCell>{format(new Date(transaction.date), "dd/MM/yyyy")}</TableCell>
+                <TableCell>{format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="font-medium">{transaction.description}</TableCell>
                 <TableCell>
                   <div className="flex items-center">
@@ -106,15 +115,15 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
                         <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
+                        <span className="sr-only">Ações</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onEdit(transaction)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Edit
+                        <Edit2 className="mr-2 h-4 w-4" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onDelete(transaction.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

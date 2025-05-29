@@ -1,3 +1,4 @@
+
 // @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
@@ -21,11 +22,11 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const MOCK_TRANSACTIONS: Transaction[] = [
-    { id: '1', date: new Date('2024-07-15'), description: 'Monthly Salary', amount: 5000, type: 'income', category: 'salary', tags: ['work', 'payroll'] },
-    { id: '2', date: new Date('2024-07-16'), description: 'Groceries from SuperMart', amount: -150.75, type: 'expense', category: 'groceries', tags: ['food', 'home'] },
-    { id: '3', date: new Date('2024-07-17'), description: 'Dinner with Friends', amount: -85.50, type: 'expense', category: 'food_dining', tags: ['social', 'leisure'] },
-    { id: '4', date: new Date('2024-07-18'), description: 'Electricity Bill', amount: -120.00, type: 'expense', category: 'utilities', tags: ['home', 'bills'] },
-    { id: '5', date: new Date('2024-07-18'), description: 'Freelance Project Payment', amount: 750, type: 'income', category: 'salary', tags: ['work', 'freelance'] },
+    { id: '1', date: new Date('2024-07-15'), description: 'Salário Mensal', amount: 5000, type: 'income', category: 'salary', tags: ['trabalho', 'folha de pagamento'] },
+    { id: '2', date: new Date('2024-07-16'), description: 'Compras no Supermercado', amount: -150.75, type: 'expense', category: 'groceries', tags: ['comida', 'casa'] },
+    { id: '3', date: new Date('2024-07-17'), description: 'Jantar com Amigos', amount: -85.50, type: 'expense', category: 'food_dining', tags: ['social', 'lazer'] },
+    { id: '4', date: new Date('2024-07-18'), description: 'Conta de Luz', amount: -120.00, type: 'expense', category: 'utilities', tags: ['casa', 'contas'] },
+    { id: '5', date: new Date('2024-07-18'), description: 'Pagamento Projeto Freelance', amount: 750, type: 'income', category: 'salary', tags: ['trabalho', 'freelance'] },
 ];
 
 
@@ -37,8 +38,6 @@ export default function TransactionsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load transactions from local storage or API in a real app
-    // For now, using mock data if local storage is empty
     const storedTransactions = localStorage.getItem('fluxoFacilTransactions');
     if (storedTransactions) {
       setTransactions(JSON.parse(storedTransactions).map((t: Transaction) => ({...t, date: new Date(t.date)})));
@@ -48,7 +47,7 @@ export default function TransactionsPage() {
   }, []);
 
   useEffect(() => {
-    if (transactions.length > 0 || localStorage.getItem('fluxoFacilTransactions')) { // Avoid writing empty MOCK_TRANSACTIONS on first load if nothing was stored
+    if (transactions.length > 0 || localStorage.getItem('fluxoFacilTransactions')) { 
         localStorage.setItem('fluxoFacilTransactions', JSON.stringify(transactions));
     }
   }, [transactions]);
@@ -73,7 +72,6 @@ export default function TransactionsPage() {
   };
 
   const openFormForEdit = (transaction: Transaction) => {
-    // Ensure amount is positive for the form
     const formTransaction = { ...transaction, amount: Math.abs(transaction.amount) };
     setEditingTransaction(formTransaction);
     setIsFormOpen(true);
@@ -86,7 +84,7 @@ export default function TransactionsPage() {
   const confirmDelete = () => {
     if (transactionToDelete) {
       setTransactions((prev) => prev.filter((t) => t.id !== transactionToDelete));
-      toast({ title: "Transaction deleted", description: "The transaction has been successfully deleted." });
+      toast({ title: "Transação excluída", description: "A transação foi excluída com sucesso." });
       setTransactionToDelete(null);
     }
   };
@@ -95,11 +93,11 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-          <p className="text-muted-foreground">Manage your income and expenses.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
+          <p className="text-muted-foreground">Gerencie suas receitas e despesas.</p>
         </div>
         <Button onClick={openFormForNew} className="shadow-md">
-          <PlusCircle className="mr-2 h-5 w-5" /> Add Transaction
+          <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
         </Button>
       </div>
 
@@ -113,9 +111,9 @@ export default function TransactionsPage() {
       <Dialog open={isFormOpen} onOpenChange={(open) => { if(!open) { setIsFormOpen(false); setEditingTransaction(undefined); } else { setIsFormOpen(true); }}}>
         <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingTransaction ? "Edit Transaction" : "Add New Transaction"}</DialogTitle>
+            <DialogTitle>{editingTransaction ? "Editar Transação" : "Adicionar Nova Transação"}</DialogTitle>
             <DialogDescription>
-              {editingTransaction ? "Update the details of your transaction." : "Enter the details of your new transaction."}
+              {editingTransaction ? "Atualize os detalhes da sua transação." : "Insira os detalhes da sua nova transação."}
             </DialogDescription>
           </DialogHeader>
           <TransactionForm
@@ -129,15 +127,15 @@ export default function TransactionsPage() {
       <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => {if(!open) setTransactionToDelete(null)}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this transaction?</AlertDialogTitle>
+            <AlertDialogTitle>Tem certeza que deseja excluir esta transação?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the transaction.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente a transação.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

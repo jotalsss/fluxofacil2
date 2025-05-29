@@ -1,3 +1,4 @@
+
 // noinspection JSUnusedLocalSymbols
 'use server';
 /**
@@ -44,11 +45,11 @@ const prompt = ai.definePrompt({
   name: 'suggestTransactionCategoryPrompt',
   input: {schema: SuggestTransactionCategoryInputSchema},
   output: {schema: SuggestTransactionCategoryOutputSchema},
-  prompt: `You are a personal finance expert. Given a transaction description, you will suggest a category for the transaction.
+  prompt: `Você é um especialista em finanças pessoais. Dada uma descrição de transação, você sugerirá uma categoria para a transação.
 
-Transaction Description: {{{transactionDescription}}}
+Descrição da Transação: {{{transactionDescription}}}
 
-Respond with a suggested category and your confidence level.`,
+Responda com uma categoria sugerida e seu nível de confiança. As categorias válidas são: salary, groceries, food_dining, housing, transportation, utilities, clothing, entertainment, health_wellness, education, investments, gifts, donations, other. Retorne o ID da categoria.`,
 });
 
 const suggestTransactionCategoryFlow = ai.defineFlow(
