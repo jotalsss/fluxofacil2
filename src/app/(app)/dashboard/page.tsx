@@ -3,8 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays, Loader2 } from "lucide-react";
-import Image from "next/image";
+import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays, Loader2, PieChart as PieChartIcon } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -19,7 +18,19 @@ import { CATEGORIES_MAP } from '@/lib/constants';
 import type { Transaction } from '@/lib/types';
 import { getTransactions } from '@/lib/firebase/firestoreService';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth'; // Importar useAuth
+import { useAuth } from '@/hooks/useAuth';
+
+import { PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig
+} from "@/components/ui/chart";
+import { cn } from '@/lib/utils';
+
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -44,14 +55,18 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialFilterDone, setIsInitialFilterDone] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth(); // Obter o usuário autenticado
+  const { user } = useAuth();
+
+  const [pieChartData, setPieChartData] = useState<any[]>([]);
+  const [pieChartConfig, setPieChartConfig] = useState<ChartConfig>({});
+
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   const fetchAndSetTransactions = useCallback(async () => {
-    if (!user) { // Não buscar se não houver usuário
+    if (!user) {
       setAllTransactions([]);
       setIsLoading(false);
       return;
@@ -71,13 +86,16 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, user]); // Adicionar user como dependência
+  }, [toast, user]);
 
   useEffect(() => {
-    if (isClient) { // Apenas busca se for client-side
+    if (isClient && user) { 
       fetchAndSetTransactions();
+    } else if (!user && isClient) {
+      setIsLoading(false); // No user, stop loading
+      setAllTransactions([]);
     }
-  }, [isClient, fetchAndSetTransactions]);
+  }, [isClient, user, fetchAndSetTransactions]);
 
 
   const applyFiltersAndRecalculate = useCallback(() => {
@@ -113,29 +131,62 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    if (isClient && !isLoading && !isInitialFilterDone && allTransactions.length > 0) {
+    if (isClient && !isLoading && !isInitialFilterDone && (allTransactions.length > 0 || !user)) {
       applyFiltersAndRecalculate();
       setIsInitialFilterDone(true);
-    } else if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone) {
-      // Se não há transações, zera os valores e marca como filtro inicial feito
+    } else if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone && user) {
       setFilteredTransactions([]);
       setCurrentTotalIncome(0);
       setCurrentTotalExpenses(0);
       setCurrentBalance(0);
       setIsInitialFilterDone(true);
     }
-  }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone]);
+  }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone, user]);
+
+  useEffect(() => {
+    if (filteredTransactions.length > 0) {
+      const expenseByCategory = filteredTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((acc, transaction) => {
+          const categoryId = transaction.category;
+          const categoryName = CATEGORIES_MAP.get(categoryId)?.name || categoryId;
+          const currentAmount = acc[categoryId]?.value || 0;
+          acc[categoryId] = {
+            name: categoryName,
+            value: currentAmount + Math.abs(transaction.amount),
+            id: categoryId,
+          };
+          return acc;
+        }, {} as Record<string, { name: string, value: number, id: string }>);
+  
+      const chartData = Object.values(expenseByCategory).sort((a,b) => b.value - a.value); // Sort for consistent color assignment
+      setPieChartData(chartData);
+  
+      const newChartConfig = chartData.reduce((config, item, index) => {
+        config[item.id] = {
+          label: item.name,
+          color: `hsl(var(--chart-${(index % 5) + 1}))`, // Cycle through 5 chart colors
+        };
+        return config;
+      }, {} as ChartConfig);
+      setPieChartConfig(newChartConfig);
+  
+    } else {
+      setPieChartData([]);
+      setPieChartConfig({});
+    }
+  }, [filteredTransactions]);
 
 
   const handleFilterButtonClick = () => {
-    if (isLoading) {
+    if (isLoading && user) { // only show toast if user is logged in and loading
         toast({ title: "Aguarde", description: "Carregando transações..."});
         return;
     }
     applyFiltersAndRecalculate();
   };
 
-  if (isLoading && isClient) { 
+  if (isLoading && isClient && user) { 
     return (
       <div className="flex flex-col justify-center items-center h-64 space-y-2">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -219,7 +270,6 @@ export default function DashboardPage() {
             <ul className="space-y-3">
               {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.map((transaction) => {
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
-                const CategoryIcon = categoryDetails?.icon;
                 const transactionDate = transaction.date;
                 return (
                 <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
@@ -235,31 +285,58 @@ export default function DashboardPage() {
                 </li>
               )}) : (
                 <p className="text-muted-foreground text-center py-4">
-                  {/*  Removido: isLoading && !allTransactions.length ? "Carregando transações..." : */}
-                   "Nenhuma transação para este período."
+                   {(!user && !isLoading) ? "Faça login para ver suas transações." : "Nenhuma transação para este período."}
                 </p>
               )}
             </ul>
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col items-center justify-center transition-all duration-300 ease-in-out hover:shadow-lg">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg flex flex-col">
           <CardHeader>
-            <CardTitle>Visão Geral dos Gastos</CardTitle>
-            <CardDescription>Representação visual dos seus hábitos de consumo.</CardDescription>
+            <CardTitle className="flex items-center">
+              <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
+              Visão Geral dos Gastos
+            </CardTitle>
+            <CardDescription>Representação visual dos seus hábitos de consumo por categoria.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center w-full">
-             <Image
-                src="https://placehold.co/600x400.png"
-                alt="Gráfico de exemplo da visão geral de gastos"
-                width={600}
-                height={400}
-                data-ai-hint="finance chart"
-                className="rounded-md object-cover"
-              />
+          <CardContent className="flex-1 flex items-center justify-center p-4">
+            {pieChartData.length > 0 ? (
+              <ChartContainer config={pieChartConfig} className="h-[300px] w-full">
+                <RechartsPieChart accessibilityLayer>
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent hideLabel nameKey="name" indicator="dot" />}
+                  />
+                  <Pie
+                    data={pieChartData}
+                    dataKey="value"
+                    nameKey="name" // Used by ChartTooltipContent
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    labelLine={false}
+                  >
+                    {pieChartData.map((entry) => (
+                      <Cell key={`cell-${entry.id}`} fill={`var(--color-${entry.id})`} />
+                    ))}
+                  </Pie>
+                   {/* @ts-ignore TODO: Fix ChartLegendContent type or props */}
+                  <ChartLegend content={<ChartLegendContent nameKey="name"/>} />
+                </RechartsPieChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <PieChartIcon className="h-16 w-16 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  {(!user && !isLoading) ? "Faça login para ver seus gastos." : "Nenhum gasto para exibir no gráfico neste período."}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
