@@ -1,8 +1,7 @@
 
-// @ts-nocheck remove this ts-nocheck comment when you have fixed all the errors
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { PlusCircle } from "lucide-react";
@@ -19,44 +18,46 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-    { id: '1', date: new Date('2024-07-01'), description: 'Salário Mensal', amount: 5000, type: 'income', category: 'salary', tags: ['trabalho', 'folha de pagamento'] },
-    { id: '2', date: new Date('2024-07-01'), description: 'Compras no Supermercado', amount: -150.75, type: 'expense', category: 'groceries', tags: ['comida', 'casa'] },
-    { id: '3', date: new Date('2024-06-01'), description: 'Jantar com Amigos', amount: -85.50, type: 'expense', category: 'food_dining', tags: ['social', 'lazer'] },
-    { id: '4', date: new Date('2024-06-01'), description: 'Conta de Luz', amount: -120.00, type: 'expense', category: 'utilities', tags: ['casa', 'contas'] },
-    { id: '5', date: new Date('2024-05-01'), description: 'Pagamento Projeto Freelance', amount: 750, type: 'income', category: 'salary', tags: ['trabalho', 'freelance'] },
-];
-
+} from "@/components/ui/alert-dialog";
+import { 
+  addTransaction, 
+  getTransactions, 
+  updateTransaction, 
+  deleteTransaction 
+} from '@/lib/firebase/firestoreService';
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const storedTransactions = localStorage.getItem('fluxoFacilTransactions');
-    if (storedTransactions) {
-      setTransactions(JSON.parse(storedTransactions).map((t: any) => ({...t, date: new Date(t.date)})));
-    } else {
-      setTransactions(MOCK_TRANSACTIONS);
+  const fetchTransactions = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedTransactions = await getTransactions();
+      setTransactions(fetchedTransactions);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar transações",
+        description: "Não foi possível carregar as transações do banco de dados.",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
-    if (transactions.length > 0 || localStorage.getItem('fluxoFacilTransactions')) { 
-        localStorage.setItem('fluxoFacilTransactions', JSON.stringify(transactions));
-    }
-  }, [transactions]);
+    fetchTransactions();
+  }, [fetchTransactions]);
 
-
-  const handleAddTransaction = (data: Omit<Transaction, 'id' | 'amount'> & { amount: number, month: string, year: string }) => {
+  const handleAddTransaction = async (data: Omit<Transaction, 'id' | 'amount'> & { amount: number, month: string, year: string }) => {
     const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
-    const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
+    const newTransactionData = {
       date: transactionDate,
       description: data.description,
       amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
@@ -64,14 +65,24 @@ export default function TransactionsPage() {
       category: data.category,
       tags: data.tags || [],
     };
-    setTransactions((prev) => [newTransaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    setIsFormOpen(false);
+    try {
+      await addTransaction(newTransactionData);
+      toast({ title: "Transação adicionada!", description: `"${data.description}" foi adicionada.` });
+      fetchTransactions(); // Re-fetch para atualizar a lista
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao adicionar transação",
+        description: "Não foi possível salvar a nova transação.",
+      });
+    }
   };
 
-  const handleEditTransaction = (data: Omit<Transaction, 'id' | 'amount'> & { id: string, amount: number, month: string, year: string }) => {
+  const handleEditTransaction = async (data: Omit<Transaction, 'id' | 'amount'> & { id: string, amount: number, month: string, year: string }) => {
     const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
-    const updatedTransaction: Transaction = {
-      id: data.id,
+    const updatedTransactionData = {
       date: transactionDate,
       description: data.description,
       amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
@@ -79,11 +90,20 @@ export default function TransactionsPage() {
       category: data.category,
       tags: data.tags || [],
     };
-    setTransactions((prev) =>
-      prev.map((t) => (t.id === updatedTransaction.id ? updatedTransaction : t)).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    );
-    setIsFormOpen(false);
-    setEditingTransaction(undefined);
+    try {
+      await updateTransaction(data.id, updatedTransactionData);
+      toast({ title: "Transação atualizada!", description: `"${data.description}" foi atualizada.` });
+      fetchTransactions(); // Re-fetch para atualizar a lista
+      setIsFormOpen(false);
+      setEditingTransaction(undefined);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao atualizar transação",
+        description: "Não foi possível salvar as alterações.",
+      });
+    }
   };
 
   const openFormForNew = () => {
@@ -92,11 +112,9 @@ export default function TransactionsPage() {
   };
 
   const openFormForEdit = (transaction: Transaction) => {
-    // Pass the full transaction object to the form
-    // The form will handle extracting month/year from the date for its own state
     const formInitialData = { 
         ...transaction, 
-        amount: Math.abs(transaction.amount) // form expects positive amount
+        amount: Math.abs(transaction.amount) 
     };
     setEditingTransaction(formInitialData);
     setIsFormOpen(true);
@@ -106,11 +124,22 @@ export default function TransactionsPage() {
     setTransactionToDelete(transactionId);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (transactionToDelete) {
-      setTransactions((prev) => prev.filter((t) => t.id !== transactionToDelete));
-      toast({ title: "Transação excluída", description: "A transação foi excluída com sucesso." });
-      setTransactionToDelete(null);
+      try {
+        await deleteTransaction(transactionToDelete);
+        toast({ title: "Transação excluída", description: "A transação foi excluída com sucesso." });
+        fetchTransactions(); // Re-fetch para atualizar a lista
+        setTransactionToDelete(null);
+      } catch (error) {
+        console.error(error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao excluir transação",
+          description: "Não foi possível excluir a transação.",
+        });
+        setTransactionToDelete(null);
+      }
     }
   };
 
@@ -126,12 +155,16 @@ export default function TransactionsPage() {
         </Button>
       </div>
 
-      <TransactionList
-        transactions={transactions}
-        onEdit={openFormForEdit}
-        onDelete={handleDeleteRequest}
-        onAddTransaction={openFormForNew}
-      />
+      {isLoading ? (
+        <p className="text-center text-muted-foreground py-10">Carregando transações...</p>
+      ) : (
+        <TransactionList
+          transactions={transactions}
+          onEdit={openFormForEdit}
+          onDelete={handleDeleteRequest}
+          onAddTransaction={openFormForNew}
+        />
+      )}
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if(!open) { setIsFormOpen(false); setEditingTransaction(undefined); } else { setIsFormOpen(true); }}}>
         <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
@@ -143,7 +176,7 @@ export default function TransactionsPage() {
           </DialogHeader>
           <TransactionForm
             onSubmit={editingTransaction ? handleEditTransaction : handleAddTransaction}
-            initialData={editingTransaction} // Pass the full transaction for editing
+            initialData={editingTransaction} 
             onClose={() => { setIsFormOpen(false); setEditingTransaction(undefined);}}
           />
         </DialogContent>
