@@ -27,7 +27,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
             <TrendingUp className="h-5 w-5 text-green-500" />
@@ -37,7 +37,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">+10% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
             <TrendingDown className="h-5 w-5 text-red-500" />
@@ -47,7 +47,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">+5% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Balance</CardTitle>
             <DollarSign className="h-5 w-5 text-primary" />
@@ -60,7 +60,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center">
               <List className="h-5 w-5 mr-2 text-primary" />
@@ -71,7 +71,7 @@ export default function DashboardPage() {
           <CardContent>
             <ul className="space-y-3">
               {staticRecentTransactions.map((transaction) => (
-                <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm">
+                <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
                   <div>
                     <p className="font-medium">{transaction.description}</p>
                     <p className="text-sm text-muted-foreground">
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col items-center justify-center">
+        <Card className="flex flex-col items-center justify-center transition-all duration-300 ease-in-out hover:shadow-lg">
           <CardHeader>
             <CardTitle>Spending Overview</CardTitle>
             <CardDescription>Visual representation of your spending habits.</CardDescription>

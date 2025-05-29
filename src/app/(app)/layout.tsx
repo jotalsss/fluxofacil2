@@ -43,7 +43,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
                       isActive
                         ? "bg-primary/10 text-primary shadow-sm"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      "duration-300 ease-in-out" // Added for smoother transition on hover
                     )}
                   >
                     <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground group-hover:text-accent-foreground", "sm:mr-2")} />
@@ -59,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* User Menu, Notifications, etc. can go here, preserving some space on the right if needed */}
         </div>
       </header>
-      <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background animate-in fade-in-0 slide-in-from-bottom-5 duration-500 ease-out">
         {children}
       </main>
     </div>
