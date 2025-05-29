@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import { Geist } from 'next/font/google'; // Using only Geist Sans as per current setup
 import './globals.css';
@@ -26,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* Added suppressHydrationWarning for potential theme mismatches if dark mode was enabled by system */}
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} antialiased`}>
         {children}
         <Toaster />
