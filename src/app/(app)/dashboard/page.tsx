@@ -262,7 +262,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <List className="h-5 w-5 mr-2 text-primary" />
-              Transações Recentes (Filtradas)
+              Transações Recentes
             </CardTitle>
             <CardDescription>Transações registradas para o período selecionado.</CardDescription>
           </CardHeader>
