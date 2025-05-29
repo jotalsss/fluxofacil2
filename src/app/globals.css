@@ -55,40 +55,49 @@ body {
   }
 
   .dark {
-    /* Dark theme remains, but app primarily uses light mode based on proposal */
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --background: 0 0% 3.9%; /* Fundo escuro */
+    --foreground: 0 0% 98%; /* Texto claro */
+
+    --card: 0 0% 3.9%; /* Cards escuros */
+    --card-foreground: 0 0% 98%; /* Texto claro nos cards */
+
+    --popover: 0 0% 3.9%; /* Popovers escuros */
+    --popover-foreground: 0 0% 98%; /* Texto claro nos popovers */
+
+    --primary: 180 100% 50%; /* Ciano para elementos interativos primários */
+    --primary-foreground: 0 0% 10%; /* Texto escuro para alto contraste sobre o primário Ciano */
+
+    --secondary: 0 0% 14.9%; /* Elementos secundários escuros */
+    --secondary-foreground: 0 0% 98%; /* Texto claro sobre secundário escuro */
+
+    --muted: 0 0% 14.9%; /* Elementos muted (suaves) escuros */
+    --muted-foreground: 0 0% 63.9%; /* Texto muted mais claro */
+
+    --accent: 180 100% 35%; /* Ciano mais escuro/relacionado para estados de hover/accent */
+    --accent-foreground: 0 0% 98%; /* Texto claro para contraste sobre o accent Ciano */
+
+    --destructive: 0 62.8% 30.6%; /* Cor destrutiva (para erros, etc.) */
+    --destructive-foreground: 0 0% 98%; /* Texto claro sobre destrutivo */
+
+    --border: 0 0% 14.9%; /* Bordas escuras */
+    --input: 0 0% 14.9%; /* Fundos de input escuros */
+    --ring: 180 100% 40%; /* Cor de anel (focus) baseada em ciano */
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 180 100% 50%; /* Cyan for dark theme too, for consistency */
-    --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    /* Cores específicas da Sidebar para um tema escuro na sidebar */
+    --sidebar-background: 240 5.9% 10%; /* Fundo escuro da sidebar */
+    --sidebar-foreground: 240 4.8% 95.9%; /* Texto claro na sidebar */
+    --sidebar-primary: 180 100% 50%; /* Ciano para itens ativos na sidebar */
+    --sidebar-primary-foreground: 0 0% 10%; /* Texto escuro sobre ciano para itens ativos na sidebar */
+    --sidebar-accent: 240 3.7% 15.9%; /* Accent mais escuro para hover de itens na sidebar */
+    --sidebar-accent-foreground: 240 4.8% 95.9%; /* Texto claro para hover de itens na sidebar */
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 180 100% 40%;
+    --sidebar-ring: 180 100% 40%; /* Cor de anel (focus) baseada em ciano para a sidebar */
   }
 }
 
