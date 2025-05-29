@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
-import type { VariantProps} from "class-variance-authority";
+import { cva, type VariantProps} from "class-variance-authority";
 import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -263,7 +263,7 @@ Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  ButtonProps // Use ButtonProps to correctly type asChild and children
+  ButtonProps
 >(({ className, onClick, children, asChild, ...props }, ref) => {
   const { toggleSidebar } = useSidebar();
 
@@ -278,16 +278,10 @@ const SidebarTrigger = React.forwardRef<
         onClick?.(event);
         toggleSidebar();
       }}
-      asChild={asChild} // Pass asChild to the underlying Button
+      asChild={asChild}
       {...props}
     >
-      {/* 
-        If asChild is true, the Button component (from ui/button) will use Slot
-        and render 'children' (passed from the parent component, e.g., AppLayout).
-        If asChild is false (or undefined), Button will render a <button>
-        and these (PanelLeft and span) will be its children.
-      */}
-      {asChild ? children : (
+      {asChild && children ? children : (
         <>
           <PanelLeft />
           <span className="sr-only">Toggle Sidebar</span>
@@ -524,6 +518,30 @@ const SidebarMenuItem = React.forwardRef<
 ))
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
+
+const sidebarMenuButtonVariants = cva(
+  "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm text-sidebar-foreground outline-none ring-sidebar-ring transition-colors ease-linear hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "",
+        ghost:
+          "bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground",
+      },
+      size: {
+        default: "h-8",
+        sm: "h-7 text-xs",
+        lg: "h-9 text-base",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+
 const SidebarMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & {
@@ -540,6 +558,7 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
+      children, // Ensure children is part of props
       ...props
     },
     ref
@@ -553,9 +572,11 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
-      />
+      >
+        {children}
+      </Comp>
     )
 
     if (!tooltip) {
@@ -741,6 +762,7 @@ export {
   SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
+  sidebarMenuButtonVariants, // export the variants
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarMenuSub,
