@@ -56,7 +56,7 @@ const transactionFormSchema = z.object({
   category: z.string().min(1, "A categoria é obrigatória."),
   tags: z.string().optional(),
   isInstallmentPurchase: z.boolean().default(false).optional(),
-  numberOfInstallments: z.coerce.number().optional(), // Removido min(2) daqui, validado no refine
+  numberOfInstallments: z.coerce.number().optional(),
 }).refine(data => {
   if (data.isInstallmentPurchase && data.type === 'expense') {
     return !!data.numberOfInstallments && data.numberOfInstallments >= 2;
@@ -67,7 +67,7 @@ const transactionFormSchema = z.object({
   path: ["numberOfInstallments"],
 }).refine(data => {
     if (data.isInstallmentPurchase && data.type === 'income') {
-        return false; // Não permitir parcelamento para receitas
+        return false; 
     }
     return true;
 }, {
@@ -89,33 +89,41 @@ export type TransactionFormSubmitData = Omit<Transaction, 'id' | 'date' | 'userI
 
 
 interface TransactionFormProps {
-  onSubmit: (data: TransactionFormSubmitData) => Promise<void>; // Alterado para Promise<void>
+  onSubmit: (data: TransactionFormSubmitData) => Promise<void>; 
   initialData?: Transaction; 
   onClose: () => void;
 }
+
+const getInitialDateForForm = () => {
+  const currentDate = new Date();
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  return {
+    month: String(currentDate.getMonth() + 1),
+    year: String(currentDate.getFullYear()),
+  };
+};
 
 export function TransactionForm({ onSubmit, initialData, onClose }: TransactionFormProps) {
   const { toast } = useToast();
   const [calculatedInstallmentAmount, setCalculatedInstallmentAmount] = useState<number | null>(null);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 
-  const defaultMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
-  const defaultYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
+  const defaultNewTransactionDate = getInitialDateForForm();
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
-      month: defaultMonth,
-      year: defaultYear,
+      month: initialData?.date ? String(initialData.date.getUTCMonth() + 1) : defaultNewTransactionDate.month,
+      year: initialData?.date ? String(initialData.date.getUTCFullYear()) : defaultNewTransactionDate.year,
       description: initialData?.description || "",
       amount: initialData?.isInstallment && initialData?.totalPurchaseAmount 
                 ? Math.abs(initialData.totalPurchaseAmount)
-                : (initialData?.amount ? Math.abs(initialData.amount) : undefined),
+                : (initialData?.amount ? Math.abs(initialData.amount) : ""),
       type: initialData?.type || "expense",
       category: initialData?.category || "",
       tags: initialData?.tags?.join(", ") || "",
       isInstallmentPurchase: initialData?.isInstallment || false,
-      numberOfInstallments: initialData?.totalInstallments || undefined,
+      numberOfInstallments: initialData?.totalInstallments ? String(initialData.totalInstallments) : "",
     },
   });
 
@@ -125,8 +133,8 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   const watchType = form.watch("type");
 
   useEffect(() => {
-    if (watchIsInstallmentPurchase && watchType === 'expense' && watchAmount > 0 && watchNumberOfInstallments && watchNumberOfInstallments >= 2) {
-      setCalculatedInstallmentAmount(watchAmount / watchNumberOfInstallments);
+    if (watchIsInstallmentPurchase && watchType === 'expense' && Number(watchAmount) > 0 && Number(watchNumberOfInstallments) >= 2) {
+      setCalculatedInstallmentAmount(Number(watchAmount) / Number(watchNumberOfInstallments));
     } else {
       setCalculatedInstallmentAmount(null);
     }
@@ -134,21 +142,39 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   
   useEffect(() => {
     const isEditingInstallment = !!initialData?.isInstallment;
-    const currentMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
-    const currentYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
+    
+    let monthToSet: string;
+    let yearToSet: string;
+
+    if (initialData?.date) {
+      monthToSet = String(initialData.date.getUTCMonth() + 1);
+      yearToSet = String(initialData.date.getUTCFullYear());
+    } else {
+      const nextMonthDate = getInitialDateForForm();
+      monthToSet = nextMonthDate.month;
+      yearToSet = nextMonthDate.year;
+    }
+    
+    const amountToSet = initialData
+      ? (initialData.isInstallment && initialData.totalPurchaseAmount
+          ? Math.abs(initialData.totalPurchaseAmount)
+          : (initialData.amount ? Math.abs(initialData.amount) : ""))
+      : "";
+
+    const installmentsToSet = initialData
+      ? (initialData.totalInstallments ? String(initialData.totalInstallments) : "")
+      : "";
 
     form.reset({
-        month: currentMonth,
-        year: currentYear,
-        description: isEditingInstallment ? initialData.description.replace(/ \(Parcela \d+\/\d+\)$/, '') : initialData?.description || "",
-        amount: isEditingInstallment && initialData?.totalPurchaseAmount
-                ? Math.abs(initialData.totalPurchaseAmount)
-                : (initialData?.amount ? Math.abs(initialData.amount) : undefined),
+        month: monthToSet,
+        year: yearToSet,
+        description: isEditingInstallment && initialData ? initialData.description.replace(/ \(Parcela \d+\/\d+\)$/, '') : initialData?.description || "",
+        amount: amountToSet,
         type: initialData?.type || "expense",
         category: initialData?.category || "",
         tags: initialData?.tags?.join(", ") || "",
-        isInstallmentPurchase: isEditingInstallment,
-        numberOfInstallments: isEditingInstallment ? initialData.totalInstallments : undefined,
+        isInstallmentPurchase: !!(initialData?.isInstallment),
+        numberOfInstallments: installmentsToSet,
     });
   }, [initialData, form]);
 
@@ -160,19 +186,17 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       month: data.month,
       year: data.year,
       description: data.description,
-      amount: data.amount, 
+      amount: Number(data.amount), 
       type: data.type,
       category: data.category,
       tags: data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(tag => tag) : [],
-      isInstallmentPurchase: data.isInstallmentPurchase && data.type === 'expense', // Parcelamento só para despesas
-      numberOfInstallments: (data.isInstallmentPurchase && data.type === 'expense') ? data.numberOfInstallments : undefined,
+      isInstallmentPurchase: data.isInstallmentPurchase && data.type === 'expense', 
+      numberOfInstallments: (data.isInstallmentPurchase && data.type === 'expense' && data.numberOfInstallments) ? Number(data.numberOfInstallments) : undefined,
     };
     try {
-        await onSubmit(submitData); // onSubmit agora é async
-        // Toast é tratado na página pai agora
+        await onSubmit(submitData);
         onClose();
     } catch (error) {
-        // Erro já tratado na página pai
         console.error("Erro no formulário:", error);
     } finally {
         setIsSubmittingForm(false);
@@ -197,7 +221,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                       field.onChange(value);
                       if (value === 'income') { 
                         form.setValue("isInstallmentPurchase", false);
-                        form.setValue("numberOfInstallments", undefined);
+                        form.setValue("numberOfInstallments", "");
                       }
                     }}
                     value={field.value}
@@ -279,7 +303,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Input placeholder="ex: Compra de Geladeira, Salário" {...field} disabled={isEditingThisInstallment} />
+                <Input placeholder="ex: Compra de Geladeira, Salário" {...field} disabled={isEditingThisInstallment && !initialData?.description.includes('(Parcela')} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -298,7 +322,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                   onCheckedChange={(checked) => {
                     field.onChange(checked);
                     if (!checked) {
-                      form.setValue("numberOfInstallments", undefined);
+                      form.setValue("numberOfInstallments", "");
                       setCalculatedInstallmentAmount(null);
                     }
                   }}
@@ -330,6 +354,22 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             )}
           />
         )}
+         {isEditingThisInstallment && initialData?.totalInstallments && (
+            <FormField
+                control={form.control}
+                name="numberOfInstallments" 
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Número de Parcelas (Total)</FormLabel>
+                    <FormControl>
+                    <Input type="number" {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+        )}
+
 
         <FormField
             control={form.control}
@@ -358,6 +398,12 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             Valor de cada parcela: R$ {calculatedInstallmentAmount.toFixed(2)} (aproximadamente)
           </div>
         )}
+         {isEditingThisInstallment && initialData?.amount && initialData.isInstallment && (
+            <div className="mt-2 text-sm text-muted-foreground bg-secondary p-2 rounded-md">
+                Valor desta parcela: R$ {Math.abs(initialData.amount).toFixed(2)}
+            </div>
+        )}
+
 
         <FormField
           control={form.control}
@@ -366,7 +412,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Categoria</FormLabel>
               <div className="flex items-center gap-2">
-                <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment && !initialData?.description.includes('(Parcela')}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -407,12 +453,13 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmittingForm}>Cancelar</Button>
             <Button type="submit" disabled={isSubmittingForm || (isEditingThisInstallment && !initialData?.id) }>
               {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditingThisInstallment ? "Salvar Parcela (Limitado)" : (initialData?.id ? "Salvar Alterações" : "Salvar Transação")}
+              {isEditingThisInstallment ? "Salvar Parcela" : (initialData?.id ? "Salvar Alterações" : "Salvar Transação")}
             </Button>
         </div>
-        {isEditingThisInstallment && <p className="text-sm text-muted-foreground text-right pt-2">Edição de parcelas individuais é limitada. Para alterar detalhes da compra original (valor total, nº de parcelas), exclua todas as parcelas e adicione a compra novamente.</p>}
+        {isEditingThisInstallment && <p className="text-sm text-muted-foreground text-right pt-2">Edição de parcelas individuais permite alterar descrição, categoria e tags. Para alterar valor ou número de parcelas da compra original, exclua todas as parcelas e adicione a compra novamente.</p>}
       </form>
     </Form>
     </TooltipProvider>
   );
 }
+
