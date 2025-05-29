@@ -52,12 +52,8 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       const fetchedTransactions = await getTransactions();
-      // Certifique-se de que as datas são objetos Date
-      const transactionsWithDateObjects = fetchedTransactions.map(t => ({
-        ...t,
-        date: t.date instanceof Date ? t.date : new Date(t.date),
-      }));
-      setAllTransactions(transactionsWithDateObjects);
+      // getTransactions já deve retornar datas como objetos Date
+      setAllTransactions(fetchedTransactions);
     } catch (error) {
       console.error("Erro ao buscar transações para o dashboard:", error);
       toast({
@@ -65,7 +61,7 @@ export default function DashboardPage() {
         title: "Erro ao carregar dados",
         description: "Não foi possível buscar as transações do banco de dados.",
       });
-      setAllTransactions([]); // Define como vazio em caso de erro para não quebrar a UI
+      setAllTransactions([]); 
     } finally {
       setIsLoading(false);
     }
@@ -79,13 +75,20 @@ export default function DashboardPage() {
 
 
   const applyFiltersAndRecalculate = useCallback(() => {
-    if (!allTransactions.length && !isLoading) return; // Não filtrar se não há transações ou se ainda está carregando
+    if (!allTransactions.length && !isLoading) { // Não filtrar se não há transações ou se ainda está carregando
+      setFilteredTransactions([]);
+      setCurrentTotalIncome(0);
+      setCurrentTotalExpenses(0);
+      setCurrentBalance(0);
+      return;
+    }
 
     const monthToFilter = parseInt(selectedMonth, 10);
     const yearToFilter = parseInt(selectedYear, 10);
 
     const newFilteredTransactions = allTransactions.filter(transaction => {
-      const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
+      // transaction.date já deve ser um objeto Date
+      const transactionDate = transaction.date; 
       return transactionDate.getUTCMonth() + 1 === monthToFilter && transactionDate.getUTCFullYear() === yearToFilter;
     });
 
@@ -100,30 +103,19 @@ export default function DashboardPage() {
 
     setCurrentTotalIncome(newTotalIncome);
     setCurrentTotalExpenses(newTotalExpenses); 
-    setCurrentBalance(newTotalIncome - newTotalExpenses);
+    setCurrentBalance(newTotalIncome + newTotalExpenses); // Soma de income (positivo) e expenses (negativo)
   }, [allTransactions, selectedMonth, selectedYear, isLoading]);
 
 
   useEffect(() => {
-    // Aplica o filtro inicial assim que as transações forem carregadas e o cliente estiver pronto
-    if (isClient && !isLoading && allTransactions.length > 0 && !isInitialFilterDone) {
+    if (isClient && !isLoading && !isInitialFilterDone) {
       applyFiltersAndRecalculate();
       setIsInitialFilterDone(true);
-    }
-    // Se não houver transações após o carregamento, e o filtro inicial não foi feito,
-    // garante que os valores sejam zerados.
-    if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone) {
-      setFilteredTransactions([]);
-      setCurrentTotalIncome(0);
-      setCurrentTotalExpenses(0);
-      setCurrentBalance(0);
-      setIsInitialFilterDone(true); // Marca como feito para não tentar re-filtrar desnecessariamente
     }
   }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone]);
 
 
   const handleFilterButtonClick = () => {
-    // Se os dados ainda estão carregando, não faz nada
     if (isLoading) {
         toast({ title: "Aguarde", description: "Carregando transações..."});
         return;
@@ -131,7 +123,7 @@ export default function DashboardPage() {
     applyFiltersAndRecalculate();
   };
 
-  if (isLoading && isClient) {
+  if (isLoading && isClient && !allTransactions.length) { // Mostrar carregando apenas se não houver transações ainda
     return (
       <div className="flex justify-center items-center h-64">
         <p className="text-muted-foreground text-lg">Carregando dados do dashboard...</p>
@@ -186,7 +178,7 @@ export default function DashboardPage() {
             <TrendingDown className="h-5 w-5 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R${currentTotalExpenses.toFixed(2)}</div>
+            <div className="text-2xl font-bold">R${Math.abs(currentTotalExpenses).toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
@@ -215,7 +207,8 @@ export default function DashboardPage() {
               {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.map((transaction) => {
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const CategoryIcon = categoryDetails?.icon;
-                const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
+                // transaction.date já deve ser um objeto Date
+                const transactionDate = transaction.date;
                 return (
                 <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
                   <div>
@@ -230,7 +223,7 @@ export default function DashboardPage() {
                 </li>
               )}) : (
                 <p className="text-muted-foreground text-center py-4">
-                  {isLoading ? "Carregando transações..." : "Nenhuma transação para este período."}
+                  {isLoading && !allTransactions.length ? "Carregando transações..." : "Nenhuma transação para este período."}
                 </p>
               )}
             </ul>
@@ -257,3 +250,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
