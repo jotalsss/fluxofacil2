@@ -24,11 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn }  from "@/lib/utils";
-import { Sparkles, Loader2, CalendarIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_CATEGORIES, CATEGORIES_MAP } from "@/lib/constants";
-import { suggestTransactionCategory } from "@/ai/flows/suggest-transaction-category";
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const currentFullYear = new Date().getFullYear();
@@ -73,11 +72,9 @@ interface TransactionFormProps {
 
 export function TransactionForm({ onSubmit, initialData, onClose }: TransactionFormProps) {
   const { toast } = useToast();
-  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
-  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
 
-  const defaultMonth = initialData?.date ? String(initialData.date.getMonth() + 1) : String(new Date().getMonth() + 1);
-  const defaultYear = initialData?.date ? String(initialData.date.getFullYear()) : String(new Date().getFullYear());
+  const defaultMonth = initialData?.date ? String(initialData.date.getUTCMonth() + 1) : String(new Date().getMonth() + 1);
+  const defaultYear = initialData?.date ? String(initialData.date.getUTCFullYear()) : String(new Date().getFullYear());
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -95,8 +92,8 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   useEffect(() => {
     if (initialData) {
       form.reset({
-        month: String(initialData.date.getMonth() + 1),
-        year: String(initialData.date.getFullYear()),
+        month: String(initialData.date.getUTCMonth() + 1),
+        year: String(initialData.date.getUTCFullYear()),
         description: initialData.description || "",
         amount: initialData.amount ? Math.abs(initialData.amount) : 0,
         type: initialData.type || "expense",
@@ -131,40 +128,6 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
     onSubmit(submitData);
     toast({ title: "Transação salva!", description: `Transação "${data.description}" foi salva.` });
     onClose();
-  };
-
-  const handleSuggestCategory = async () => {
-    const description = form.getValues("description");
-    if (!description) {
-      toast({ title: "Falha na Sugestão", description: "Por favor, insira uma descrição primeiro.", variant: "destructive" });
-      return;
-    }
-    setIsSuggestingCategory(true);
-    setSuggestedCategory(null);
-    try {
-      const result = await suggestTransactionCategory({ transactionDescription: description });
-      if (result.suggestedCategory) {
-        const validCategory = DEFAULT_CATEGORIES.find(cat => cat.name.toLowerCase() === result.suggestedCategory.toLowerCase() || cat.id.toLowerCase() === result.suggestedCategory.toLowerCase());
-        if (validCategory) {
-            setSuggestedCategory(validCategory.id); 
-            toast({ title: "Sugestão da IA", description: `Categoria sugerida: ${validCategory.name} (Confiança: ${Math.round(result.confidence * 100)}%)` });
-        } else {
-            toast({ title: "Sugestão da IA", description: `Sugerido: ${result.suggestedCategory}. Não está na lista predefinida.`, variant: "default" });
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao sugerir categoria:", error);
-      toast({ title: "Falha na Sugestão", description: "Não foi possível obter a sugestão da IA.", variant: "destructive" });
-    } finally {
-      setIsSuggestingCategory(false);
-    }
-  };
-
-  const applySuggestedCategory = () => {
-    if (suggestedCategory) {
-      form.setValue("category", suggestedCategory, { shouldValidate: true });
-      setSuggestedCategory(null); 
-    }
   };
 
   return (
@@ -304,15 +267,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" size="icon" onClick={handleSuggestCategory} disabled={isSuggestingCategory} aria-label="Sugerir Categoria">
-                  {isSuggestingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                </Button>
               </div>
-              {suggestedCategory && CATEGORIES_MAP.has(suggestedCategory) && (
-                 <div className="mt-2 text-sm text-muted-foreground">
-                    IA Sugere: <Button variant="link" className="p-0 h-auto" onClick={applySuggestedCategory}>{CATEGORIES_MAP.get(suggestedCategory)?.name}</Button>
-                 </div>
-              )}
               <FormMessage />
             </FormItem>
           )}
