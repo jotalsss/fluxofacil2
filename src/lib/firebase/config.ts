@@ -1,12 +1,7 @@
 
-// Importe as funções que você precisa dos SDKs que você precisa
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-// TODO: Adicione os SDKs para os produtos Firebase que você deseja usar
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// A configuração do seu aplicativo Web do Firebase
-// IMPORTANTE: Crie um arquivo .env.local na raiz do projeto e adicione suas credenciais lá.
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -14,9 +9,9 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  // measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Opcional, descomente se for usar Analytics
 };
 
-// Inicialize o Firebase
 let app: FirebaseApp;
 let db: Firestore;
 
