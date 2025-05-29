@@ -35,7 +35,7 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Para desabilitar botões durante o submit
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   const { toast } = useToast();
   const { user } = useAuth(); 
 
@@ -50,10 +50,10 @@ export default function TransactionsPage() {
       const fetchedTransactions = await getTransactions();
       setTransactions(fetchedTransactions);
     } catch (error: any) {
-      console.error(error);
+      console.error("Erro ao buscar transações:", error);
       toast({
         variant: "destructive",
-        title: "Erro ao buscar transações",
+        title: "Erro ao Buscar Transações",
         description: error.message || "Não foi possível carregar as transações do banco de dados.",
       });
     } finally {
@@ -65,7 +65,6 @@ export default function TransactionsPage() {
     if (user) {
       fetchTransactions();
     } else {
-      // Se não houver usuário, limpa as transações e para de carregar
       setTransactions([]);
       setIsLoading(false);
     }
@@ -80,22 +79,17 @@ export default function TransactionsPage() {
     setIsSubmitting(true);
 
     try {
-      if (data.id && editingTransaction) { // Edição
+      if (data.id && editingTransaction) { 
         if (editingTransaction.isInstallment) {
-            // Edição limitada para parcelas: apenas descrição, categoria, tags
-            // A data da parcela e o valor da parcela não devem ser alterados aqui facilmente
-            // O valor total da compra original e o número de parcelas são fixos para esta parcela.
-            const transactionDate = editingTransaction.date; // Manter a data original da parcela
-            const updatedTransactionData: Partial<Transaction> = { // Partial para permitir apenas alguns campos
-              description: data.description, // Permite editar descrição geral
+            const updatedTransactionData: Partial<Transaction> = { 
+              description: data.description, 
               category: data.category,
               tags: data.tags,
-              // Não alterar: amount, type, isInstallment, installmentNumber, totalInstallments, originalPurchaseId, totalPurchaseAmount
             };
-            await updateTransaction(data.id, updatedTransactionData); // updateTransaction precisa aceitar Partial<Transaction>
+            await updateTransaction(data.id, updatedTransactionData); 
             toast({ title: "Parcela atualizada!", description: `Detalhes da parcela "${data.description}" foram atualizados.` });
 
-        } else { // Edição de transação normal
+        } else { 
             const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
             const updatedTransactionData: Omit<Transaction, 'id' | 'userId' | 'isInstallment' | 'installmentNumber' | 'totalInstallments' | 'originalPurchaseId' | 'totalPurchaseAmount'> = {
               date: transactionDate,
@@ -108,10 +102,10 @@ export default function TransactionsPage() {
             await updateTransaction(data.id, updatedTransactionData);
             toast({ title: "Transação atualizada!", description: `"${data.description}" foi atualizada.` });
         }
-      } else { // Adição
+      } else { 
         if (data.isInstallmentPurchase && data.numberOfInstallments && data.numberOfInstallments >= 2 && data.type === 'expense') {
           const originalPurchaseId = uuidv4();
-          const totalAmount = Math.abs(data.amount); // Valor total da compra
+          const totalAmount = Math.abs(data.amount); 
           const baseInstallmentAmount = parseFloat((totalAmount / data.numberOfInstallments).toFixed(2));
           
           let sumOfInstallments = 0;
@@ -119,14 +113,12 @@ export default function TransactionsPage() {
           for (let i = 0; i < data.numberOfInstallments; i++) {
             let currentInstallmentAmount;
             if (i === data.numberOfInstallments - 1) {
-              // Última parcela ajusta a diferença para bater o total exato
               currentInstallmentAmount = parseFloat((totalAmount - sumOfInstallments).toFixed(2));
             } else {
               currentInstallmentAmount = baseInstallmentAmount;
             }
             sumOfInstallments += currentInstallmentAmount;
             
-            // Adiciona 'i' meses ao mês de início, lidando com a transição de ano
             const startDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
             const transactionDate = new Date(startDate.setMonth(startDate.getMonth() + i));
             
@@ -135,7 +127,7 @@ export default function TransactionsPage() {
             const newInstallmentData: Omit<Transaction, 'id' | 'userId'> = {
               date: transactionDate,
               description: installmentDescription,
-              amount: -currentInstallmentAmount, // Despesa é negativa
+              amount: -currentInstallmentAmount, 
               type: 'expense',
               category: data.category,
               tags: data.tags,
@@ -143,13 +135,12 @@ export default function TransactionsPage() {
               installmentNumber: i + 1,
               totalInstallments: data.numberOfInstallments,
               originalPurchaseId: originalPurchaseId,
-              totalPurchaseAmount: totalAmount, // Salva o valor total da compra original
+              totalPurchaseAmount: totalAmount, 
             };
             await addTransaction(newInstallmentData);
           }
           toast({ title: "Compra parcelada adicionada!", description: `${data.numberOfInstallments} parcelas de "${data.description}" foram criadas.` });
         } else {
-          // Transação normal
           const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
           const newTransactionData: Omit<Transaction, 'id' | 'userId'> = {
             date: transactionDate,
@@ -168,10 +159,10 @@ export default function TransactionsPage() {
       setIsFormOpen(false);
       setEditingTransaction(undefined);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao salvar transação:", error);
       toast({
         variant: "destructive",
-        title: "Erro ao salvar transação",
+        title: "Erro ao Salvar Transação",
         description: (error as Error).message || "Não foi possível salvar a transação.",
       });
     } finally {
@@ -202,11 +193,11 @@ export default function TransactionsPage() {
         fetchTransactions(); 
         setTransactionToDelete(null);
       } catch (error) {
-        console.error(error);
+        console.error("Erro ao excluir transação:", error);
         toast({
           variant: "destructive",
-          title: "Erro ao excluir transação",
-          description: "Não foi possível excluir a transação.",
+          title: "Erro ao Excluir Transação",
+          description: (error as Error).message || "Não foi possível excluir a transação.",
         });
         setTransactionToDelete(null);
       } finally {

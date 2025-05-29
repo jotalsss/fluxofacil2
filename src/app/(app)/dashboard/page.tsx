@@ -75,12 +75,12 @@ export default function DashboardPage() {
     try {
       const fetchedTransactions = await getTransactions();
       setAllTransactions(fetchedTransactions);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao buscar transações para o dashboard:", error);
       toast({
         variant: "destructive",
-        title: "Erro ao carregar dados",
-        description: "Não foi possível buscar as transações do banco de dados.",
+        title: "Erro ao Carregar Dados",
+        description: error.message || "Não foi possível buscar as transações do banco de dados.",
       });
       setAllTransactions([]); 
     } finally {
@@ -159,13 +159,13 @@ export default function DashboardPage() {
           return acc;
         }, {} as Record<string, { name: string, value: number, id: string }>);
   
-      const chartData = Object.values(expenseByCategory).sort((a,b) => b.value - a.value); // Sort for consistent color assignment
+      const chartData = Object.values(expenseByCategory).sort((a,b) => b.value - a.value); 
       setPieChartData(chartData);
   
       const newChartConfig = chartData.reduce((config, item, index) => {
         config[item.id] = {
           label: item.name,
-          color: `hsl(var(--chart-${(index % 5) + 1}))`, // Cycle through 5 chart colors
+          color: `hsl(var(--chart-${(index % 5) + 1}))`, 
         };
         return config;
       }, {} as ChartConfig);
@@ -179,7 +179,7 @@ export default function DashboardPage() {
 
 
   const handleFilterButtonClick = () => {
-    if (isLoading && user) { // only show toast if user is logged in and loading
+    if (isLoading && user) { 
         toast({ title: "Aguarde", description: "Carregando transações..."});
         return;
     }
@@ -311,7 +311,7 @@ export default function DashboardPage() {
                   <Pie
                     data={pieChartData}
                     dataKey="value"
-                    nameKey="name" // Used by ChartTooltipContent
+                    nameKey="name" 
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
@@ -339,4 +339,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

@@ -35,9 +35,9 @@ export async function addTransaction(
   try {
     const docRef = await addDoc(collection(db, TRANSACTIONS_COLLECTION), dataToSave);
     return docRef.id;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Erro ao adicionar transação: ", e);
-    throw new Error("Não foi possível adicionar a transação.");
+    throw new Error(`Não foi possível adicionar a transação. Detalhe: ${e.message}`);
   }
 }
 
@@ -76,17 +76,20 @@ export async function getTransactions(): Promise<Transaction[]> {
     });
     return transactions;
   } catch (e: any) {
-    console.error("Erro ao buscar transações: ", e);
-    if (e.code === 'failed-precondition' && e.message.includes('Query requires an index')) {
-        throw new Error("Índice do Firestore ausente. Por favor, crie o índice composto: 'transactions' -> 'userId (asc)', 'date (desc)', 'description (asc)'. O link para criação geralmente é fornecido no console de erro do navegador/Firebase.");
+    console.error("Erro detalhado ao buscar transações: ", e); // Log do erro original completo
+    let detailedMessage = "Não foi possível buscar as transações.";
+    if (e.code === 'failed-precondition' && e.message && e.message.includes('Query requires an index')) {
+        detailedMessage = "Índice do Firestore ausente ou ainda sendo criado. Por favor, verifique no console do Firebase se o índice para 'transactions' com campos 'userId (asc)', 'date (desc)', 'description (asc)' está ativo. Pode levar alguns minutos para o índice ser construído.";
+    } else if (e.message) {
+        detailedMessage += ` Detalhe: ${e.message}`; 
     }
-    throw new Error("Não foi possível buscar as transações.");
+    throw new Error(detailedMessage);
   }
 }
 
 export async function updateTransaction(
   id: string,
-  transactionData: Partial<Omit<Transaction, "id" | "userId" | "date">> & { date?: Date } // Permite atualização parcial, data opcional
+  transactionData: Partial<Omit<Transaction, "id" | "userId" | "date">> & { date?: Date } 
 ): Promise<void> {
   const user = auth.currentUser;
   if (!user) {
@@ -102,10 +105,15 @@ export async function updateTransaction(
       dataToUpdate.date = Timestamp.fromDate(transactionData.date);
     }
 
+    // Remove userId from dataToUpdate to prevent it from being changed by client
+    // if it was accidentally included in transactionData
+    delete (dataToUpdate as any).userId;
+
+
     await updateDoc(transactionDoc, dataToUpdate);
-  } catch (e) {
+  } catch (e: any) {
     console.error("Erro ao atualizar transação: ", e);
-    throw new Error("Não foi possível atualizar a transação.");
+    throw new Error(`Não foi possível atualizar a transação. Detalhe: ${e.message}`);
   }
 }
 
@@ -118,8 +126,8 @@ export async function deleteTransaction(id: string): Promise<void> {
   try {
     const transactionDoc = doc(db, TRANSACTIONS_COLLECTION, id);
     await deleteDoc(transactionDoc);
-  } catch (e) {
+  } catch (e: any) {
     console.error("Erro ao deletar transação: ", e);
-    throw new Error("Não foi possível deletar a transação.");
+    throw new Error(`Não foi possível deletar a transação. Detalhe: ${e.message}`);
   }
 }
