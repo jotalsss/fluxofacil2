@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   Select,
@@ -19,6 +19,7 @@ import { CATEGORIES_MAP } from '@/lib/constants';
 import type { Transaction } from '@/lib/types';
 import { getTransactions } from '@/lib/firebase/firestoreService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth'; // Importar useAuth
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -43,16 +44,21 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialFilterDone, setIsInitialFilterDone] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth(); // Obter o usuário autenticado
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   const fetchAndSetTransactions = useCallback(async () => {
+    if (!user) { // Não buscar se não houver usuário
+      setAllTransactions([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const fetchedTransactions = await getTransactions();
-      // getTransactions já deve retornar datas como objetos Date
       setAllTransactions(fetchedTransactions);
     } catch (error) {
       console.error("Erro ao buscar transações para o dashboard:", error);
@@ -65,17 +71,17 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, user]); // Adicionar user como dependência
 
   useEffect(() => {
-    if (isClient) {
+    if (isClient) { // Apenas busca se for client-side
       fetchAndSetTransactions();
     }
   }, [isClient, fetchAndSetTransactions]);
 
 
   const applyFiltersAndRecalculate = useCallback(() => {
-    if (!allTransactions.length && !isLoading) { // Não filtrar se não há transações ou se ainda está carregando
+    if (!allTransactions.length && !isLoading) { 
       setFilteredTransactions([]);
       setCurrentTotalIncome(0);
       setCurrentTotalExpenses(0);
@@ -87,7 +93,6 @@ export default function DashboardPage() {
     const yearToFilter = parseInt(selectedYear, 10);
 
     const newFilteredTransactions = allTransactions.filter(transaction => {
-      // transaction.date já deve ser um objeto Date
       const transactionDate = transaction.date; 
       return transactionDate.getUTCMonth() + 1 === monthToFilter && transactionDate.getUTCFullYear() === yearToFilter;
     });
@@ -103,13 +108,20 @@ export default function DashboardPage() {
 
     setCurrentTotalIncome(newTotalIncome);
     setCurrentTotalExpenses(newTotalExpenses); 
-    setCurrentBalance(newTotalIncome + newTotalExpenses); // Soma de income (positivo) e expenses (negativo)
+    setCurrentBalance(newTotalIncome + newTotalExpenses);
   }, [allTransactions, selectedMonth, selectedYear, isLoading]);
 
 
   useEffect(() => {
-    if (isClient && !isLoading && !isInitialFilterDone) {
+    if (isClient && !isLoading && !isInitialFilterDone && allTransactions.length > 0) {
       applyFiltersAndRecalculate();
+      setIsInitialFilterDone(true);
+    } else if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone) {
+      // Se não há transações, zera os valores e marca como filtro inicial feito
+      setFilteredTransactions([]);
+      setCurrentTotalIncome(0);
+      setCurrentTotalExpenses(0);
+      setCurrentBalance(0);
       setIsInitialFilterDone(true);
     }
   }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone]);
@@ -123,9 +135,10 @@ export default function DashboardPage() {
     applyFiltersAndRecalculate();
   };
 
-  if (isLoading && isClient && !allTransactions.length) { // Mostrar carregando apenas se não houver transações ainda
+  if (isLoading && isClient) { 
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex flex-col justify-center items-center h-64 space-y-2">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground text-lg">Carregando dados do dashboard...</p>
       </div>
     );
@@ -207,7 +220,6 @@ export default function DashboardPage() {
               {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.map((transaction) => {
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const CategoryIcon = categoryDetails?.icon;
-                // transaction.date já deve ser um objeto Date
                 const transactionDate = transaction.date;
                 return (
                 <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
@@ -223,7 +235,8 @@ export default function DashboardPage() {
                 </li>
               )}) : (
                 <p className="text-muted-foreground text-center py-4">
-                  {isLoading && !allTransactions.length ? "Carregando transações..." : "Nenhuma transação para este período."}
+                  {/*  Removido: isLoading && !allTransactions.length ? "Carregando transações..." : */}
+                   "Nenhuma transação para este período."
                 </p>
               )}
             </ul>
@@ -250,4 +263,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

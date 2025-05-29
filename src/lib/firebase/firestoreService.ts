@@ -10,25 +10,28 @@ import {
   query,
   orderBy,
   where,
-  WriteBatch,
-  writeBatch,
+  // WriteBatch, // Não está sendo usado
+  // writeBatch, // Não está sendo usado
 } from "firebase/firestore";
-import { db } from "./config";
+import { db, auth } from "./config"; // Importar auth
 import type { Transaction } from "@/lib/types";
 
 const TRANSACTIONS_COLLECTION = "transactions";
 
-// Nota: Idealmente, as transações seriam armazenadas sob um ID de usuário específico
-// ex: /users/{userId}/transactions. Isso requer autenticação.
-// Por enquanto, usaremos uma coleção de nível superior.
-
 export async function addTransaction(
-  transactionData: Omit<Transaction, "id" | "date"> & { date: Date } // date é JS Date aqui
+  transactionData: Omit<Transaction, "id" | "date" | "userId"> & { date: Date }
 ): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) {
+    console.error("Erro: Usuário não autenticado tentando adicionar transação.");
+    throw new Error("Usuário não autenticado.");
+  }
+
   try {
     const docRef = await addDoc(collection(db, TRANSACTIONS_COLLECTION), {
       ...transactionData,
-      date: Timestamp.fromDate(transactionData.date), // Converter JS Date para Firestore Timestamp
+      userId: user.uid, // Adicionar userId do usuário logado
+      date: Timestamp.fromDate(transactionData.date),
     });
     return docRef.id;
   } catch (e) {
@@ -38,8 +41,19 @@ export async function addTransaction(
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
+  const user = auth.currentUser;
+  if (!user) {
+    // Se não houver usuário logado, retorna array vazio.
+    // As páginas protegidas não devem permitir chegar aqui sem usuário.
+    return []; 
+  }
+
   try {
-    const q = query(collection(db, TRANSACTIONS_COLLECTION), orderBy("date", "desc"));
+    const q = query(
+      collection(db, TRANSACTIONS_COLLECTION),
+      where("userId", "==", user.uid), // Filtrar por userId do usuário logado
+      orderBy("date", "desc")
+    );
     const querySnapshot = await getDocs(q);
     const transactions: Transaction[] = [];
     querySnapshot.forEach((doc) => {
@@ -47,8 +61,8 @@ export async function getTransactions(): Promise<Transaction[]> {
       transactions.push({
         id: doc.id,
         ...data,
-        date: (data.date as Timestamp).toDate(), // Converter Firestore Timestamp para JS Date
-      } as Transaction);
+        date: (data.date as Timestamp).toDate(),
+      } as Transaction); // O 'as Transaction' já considera o userId
     });
     return transactions;
   } catch (e) {
@@ -59,13 +73,24 @@ export async function getTransactions(): Promise<Transaction[]> {
 
 export async function updateTransaction(
   id: string,
-  transactionData: Omit<Transaction, "id" | "date"> & { date: Date } // date é JS Date aqui
+  transactionData: Omit<Transaction, "id" | "date" | "userId"> & { date: Date }
 ): Promise<void> {
+  // As regras do Firestore garantirão que apenas o proprietário possa atualizar.
+  // O userId não deve ser alterado aqui.
+  const user = auth.currentUser;
+  if (!user) {
+    console.error("Erro: Usuário não autenticado tentando atualizar transação.");
+    throw new Error("Usuário não autenticado.");
+  }
+  // Poderíamos adicionar uma verificação aqui para garantir que a transação pertence ao usuário antes de tentar atualizar,
+  // mas as regras do Firestore são a principal camada de segurança.
   try {
     const transactionDoc = doc(db, TRANSACTIONS_COLLECTION, id);
     await updateDoc(transactionDoc, {
       ...transactionData,
-      date: Timestamp.fromDate(transactionData.date), // Converter JS Date para Firestore Timestamp
+      // userId: user.uid, // NÃO ATUALIZE O userId AQUI para evitar que um usuário se aproprie da transação de outro.
+                         // A regra de update do Firestore deve impedir a alteração do userId.
+      date: Timestamp.fromDate(transactionData.date),
     });
   } catch (e) {
     console.error("Erro ao atualizar transação: ", e);
@@ -74,6 +99,12 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
+  // As regras do Firestore garantirão que apenas o proprietário possa deletar.
+  const user = auth.currentUser;
+  if (!user) {
+    console.error("Erro: Usuário não autenticado tentando deletar transação.");
+    throw new Error("Usuário não autenticado.");
+  }
   try {
     const transactionDoc = doc(db, TRANSACTIONS_COLLECTION, id);
     await deleteDoc(transactionDoc);

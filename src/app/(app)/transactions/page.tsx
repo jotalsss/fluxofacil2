@@ -25,6 +25,7 @@ import {
   updateTransaction, 
   deleteTransaction 
 } from '@/lib/firebase/firestoreService';
+import { useAuth } from '@/hooks/useAuth'; // Importar useAuth
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -33,8 +34,14 @@ export default function TransactionsPage() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth(); // Obter o usuário autenticado
 
   const fetchTransactions = useCallback(async () => {
+    if (!user) { // Não buscar se não houver usuário
+      setTransactions([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const fetchedTransactions = await getTransactions();
@@ -49,26 +56,33 @@ export default function TransactionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, user]); // Adicionar user como dependência
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const handleAddTransaction = async (data: Omit<Transaction, 'id' | 'amount'> & { amount: number, month: string, year: string }) => {
+  // Omit<Transaction, 'id' | 'date' | 'userId' | 'amount'> & { amount: number, month: string, year: string }
+  // A função onSubmit do TransactionForm agora tem 'id?' e 'tags: string[]' como definido no form
+  const handleAddTransaction = async (data: Omit<Transaction, 'id' | 'date' | 'userId' | 'amount'> & { amount: number, month: string, year: string, tags: string[] }) => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado." });
+      return;
+    }
     const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
+    // userId será adicionado pelo firestoreService
     const newTransactionData = {
       date: transactionDate,
       description: data.description,
       amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
       type: data.type,
       category: data.category,
-      tags: data.tags || [],
+      tags: data.tags, 
     };
     try {
       await addTransaction(newTransactionData);
       toast({ title: "Transação adicionada!", description: `"${data.description}" foi adicionada.` });
-      fetchTransactions(); // Re-fetch para atualizar a lista
+      fetchTransactions(); 
       setIsFormOpen(false);
     } catch (error) {
       console.error(error);
@@ -79,21 +93,28 @@ export default function TransactionsPage() {
       });
     }
   };
-
-  const handleEditTransaction = async (data: Omit<Transaction, 'id' | 'amount'> & { id: string, amount: number, month: string, year: string }) => {
+  
+  // Omit<Transaction, 'id' | 'date' | 'userId' | 'amount'> & { id: string, amount: number, month: string, year: string, tags: string[] }
+  const handleEditTransaction = async (data: Omit<Transaction, 'date' | 'userId' | 'amount'> & { id: string, amount: number, month: string, year: string, tags: string[] }) => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado." });
+      return;
+    }
     const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
+    // userId não é passado para updateTransaction; firestoreService não o altera.
+    // As regras do Firestore devem garantir que o usuário só edite suas próprias transações.
     const updatedTransactionData = {
       date: transactionDate,
       description: data.description,
       amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
       type: data.type,
       category: data.category,
-      tags: data.tags || [],
+      tags: data.tags,
     };
     try {
       await updateTransaction(data.id, updatedTransactionData);
       toast({ title: "Transação atualizada!", description: `"${data.description}" foi atualizada.` });
-      fetchTransactions(); // Re-fetch para atualizar a lista
+      fetchTransactions(); 
       setIsFormOpen(false);
       setEditingTransaction(undefined);
     } catch (error) {
@@ -112,11 +133,8 @@ export default function TransactionsPage() {
   };
 
   const openFormForEdit = (transaction: Transaction) => {
-    const formInitialData = { 
-        ...transaction, 
-        amount: Math.abs(transaction.amount) 
-    };
-    setEditingTransaction(formInitialData);
+    // Não é mais necessário criar formInitialData, pois o TransactionForm espera Transaction
+    setEditingTransaction(transaction);
     setIsFormOpen(true);
   };
   
@@ -129,7 +147,7 @@ export default function TransactionsPage() {
       try {
         await deleteTransaction(transactionToDelete);
         toast({ title: "Transação excluída", description: "A transação foi excluída com sucesso." });
-        fetchTransactions(); // Re-fetch para atualizar a lista
+        fetchTransactions(); 
         setTransactionToDelete(null);
       } catch (error) {
         console.error(error);
