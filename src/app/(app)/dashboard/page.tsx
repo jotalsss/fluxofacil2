@@ -16,20 +16,9 @@ import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES_MAP } from '@/lib/constants';
-
-// Expanded dummy data for filtering
-const ALL_TRANSACTIONS_DATA = [
-  { id: 't1', description: 'Salário Julho', amount: 5000, type: 'income', date: '2023-07-01', category: 'salary', tags: ['trabalho'] },
-  { id: 't2', description: 'Supermercado QLP', amount: 150, type: 'expense', date: '2023-07-01', category: 'groceries', tags: ['comida'] },
-  { id: 't3', description: 'Assinatura Streaming', amount: 45, type: 'expense', date: '2023-07-01', category: 'entertainment', tags: ['lazer'] },
-  { id: 't4', description: 'Aluguel Maio', amount: 1200, type: 'expense', date: '2023-05-01', category: 'housing', tags: ['moradia'] },
-  { id: 't5', description: 'Salário Maio', amount: 5200, type: 'income', date: '2023-05-01', category: 'salary', tags: ['trabalho'] },
-  { id: 't6', description: 'Restaurante Jan', amount: 180, type: 'expense', date: '2024-01-01', category: 'food_dining', tags: ['lazer', 'jantar'] },
-  { id: 't7', description: 'Freelance Jan', amount: 800, type: 'income', date: '2024-01-01', category: 'salary', tags: ['trabalho', 'freela'] },
-  { id: 't8', description: 'Conta de Luz Julho', amount: 120, type: 'expense', date: '2023-07-01', category: 'utilities', tags: ['casa'] },
-  { id: 't9', description: 'Presente Aniversário Maio', amount: 100, type: 'expense', date: '2023-05-01', category: 'gifts', tags: ['social'] },
-  { id: 't10', description: 'Investimento Jan', amount: 500, type: 'expense', date: '2024-01-01', category: 'investments', tags: ['finanças'] },
-];
+import type { Transaction } from '@/lib/types';
+import { getTransactions } from '@/lib/firebase/firestoreService';
+import { useToast } from '@/hooks/use-toast';
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -45,35 +34,57 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => (new Date().getMonth() + 1).toString());
   const [selectedYear, setSelectedYear] = useState<string>(() => new Date().getFullYear().toString());
 
-  const [allTransactions, setAllTransactions] = useState<Array<any & { date: Date }>>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<Array<any & { date: Date }>>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [currentTotalIncome, setCurrentTotalIncome] = useState(0);
   const [currentTotalExpenses, setCurrentTotalExpenses] = useState(0);
   const [currentBalance, setCurrentBalance] = useState(0);
+  
+  const [isLoading, setIsLoading] = useState(true);
   const [isInitialFilterDone, setIsInitialFilterDone] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (isClient) {
-      const transactionsWithDateObjects = ALL_TRANSACTIONS_DATA.map(t => ({
+  const fetchAndSetTransactions = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedTransactions = await getTransactions();
+      // Certifique-se de que as datas são objetos Date
+      const transactionsWithDateObjects = fetchedTransactions.map(t => ({
         ...t,
-        date: new Date(t.date), 
+        date: t.date instanceof Date ? t.date : new Date(t.date),
       }));
       setAllTransactions(transactionsWithDateObjects);
+    } catch (error) {
+      console.error("Erro ao buscar transações para o dashboard:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar dados",
+        description: "Não foi possível buscar as transações do banco de dados.",
+      });
+      setAllTransactions([]); // Define como vazio em caso de erro para não quebrar a UI
+    } finally {
+      setIsLoading(false);
     }
-  }, [isClient]);
+  }, [toast]);
+
+  useEffect(() => {
+    if (isClient) {
+      fetchAndSetTransactions();
+    }
+  }, [isClient, fetchAndSetTransactions]);
+
 
   const applyFiltersAndRecalculate = useCallback(() => {
-    if (!allTransactions.length) return;
+    if (!allTransactions.length && !isLoading) return; // Não filtrar se não há transações ou se ainda está carregando
 
     const monthToFilter = parseInt(selectedMonth, 10);
     const yearToFilter = parseInt(selectedYear, 10);
 
     const newFilteredTransactions = allTransactions.filter(transaction => {
-      // Ensure date is a Date object
       const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
       return transactionDate.getUTCMonth() + 1 === monthToFilter && transactionDate.getUTCFullYear() === yearToFilter;
     });
@@ -90,19 +101,43 @@ export default function DashboardPage() {
     setCurrentTotalIncome(newTotalIncome);
     setCurrentTotalExpenses(newTotalExpenses); 
     setCurrentBalance(newTotalIncome - newTotalExpenses);
-  }, [allTransactions, selectedMonth, selectedYear]);
+  }, [allTransactions, selectedMonth, selectedYear, isLoading]);
+
 
   useEffect(() => {
-    if (isClient && allTransactions.length > 0 && !isInitialFilterDone) {
+    // Aplica o filtro inicial assim que as transações forem carregadas e o cliente estiver pronto
+    if (isClient && !isLoading && allTransactions.length > 0 && !isInitialFilterDone) {
       applyFiltersAndRecalculate();
       setIsInitialFilterDone(true);
     }
-  }, [isClient, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone]);
+    // Se não houver transações após o carregamento, e o filtro inicial não foi feito,
+    // garante que os valores sejam zerados.
+    if (isClient && !isLoading && allTransactions.length === 0 && !isInitialFilterDone) {
+      setFilteredTransactions([]);
+      setCurrentTotalIncome(0);
+      setCurrentTotalExpenses(0);
+      setCurrentBalance(0);
+      setIsInitialFilterDone(true); // Marca como feito para não tentar re-filtrar desnecessariamente
+    }
+  }, [isClient, isLoading, allTransactions, applyFiltersAndRecalculate, isInitialFilterDone]);
 
 
   const handleFilterButtonClick = () => {
+    // Se os dados ainda estão carregando, não faz nada
+    if (isLoading) {
+        toast({ title: "Aguarde", description: "Carregando transações..."});
+        return;
+    }
     applyFiltersAndRecalculate();
   };
+
+  if (isLoading && isClient) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p className="text-muted-foreground text-lg">Carregando dados do dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -143,7 +178,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">R${currentTotalIncome.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">+10% do último mês</p> */}
           </CardContent>
         </Card>
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
@@ -153,7 +187,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">R${currentTotalExpenses.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">+5% do último mês</p> */}
           </CardContent>
         </Card>
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1">
@@ -179,7 +212,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {filteredTransactions.length > 0 ? filteredTransactions.map((transaction) => {
+              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.map((transaction) => {
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const CategoryIcon = categoryDetails?.icon;
                 const transactionDate = transaction.date instanceof Date ? transaction.date : new Date(transaction.date);
@@ -191,12 +224,14 @@ export default function DashboardPage() {
                       {categoryDetails?.name || transaction.category} - {isClient ? format(transactionDate, 'MMMM/yyyy', { locale: ptBR }) : '...'}
                     </p>
                   </div>
-                  <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                    {transaction.type === 'income' ? '+' : '-'}R${transaction.amount.toFixed(2)}
+                  <p className={`font-semibold ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {transaction.amount >= 0 ? '+' : ''}R${Math.abs(transaction.amount).toFixed(2)}
                   </p>
                 </li>
               )}) : (
-                <p className="text-muted-foreground text-center py-4">Nenhuma transação para este período.</p>
+                <p className="text-muted-foreground text-center py-4">
+                  {isLoading ? "Carregando transações..." : "Nenhuma transação para este período."}
+                </p>
               )}
             </ul>
           </CardContent>
