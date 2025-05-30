@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Loader2 } from "lucide-react";
+import { PlusCircle, Loader2, Download } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { TransactionForm, type TransactionFormSubmitData } from "@/components/transactions/TransactionForm";
@@ -27,6 +27,9 @@ import {
 } from '@/lib/firebase/firestoreService';
 import { useAuth } from '@/hooks/useAuth';
 import { v4 as uuidv4 } from 'uuid';
+import { CATEGORIES_MAP } from '@/lib/constants';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 
 export default function TransactionsPage() {
@@ -103,7 +106,7 @@ export default function TransactionsPage() {
         // Adição de nova transação
         if (data.isInstallmentPurchase && data.numberOfInstallments && data.numberOfInstallments >= 2 && data.type === 'expense') {
           const originalPurchaseId = uuidv4();
-          const totalAmountForDb = Math.abs(data.amount);
+          const totalAmountForDb = Math.abs(data.amount); // Valor total da compra
           const baseInstallmentAmount = parseFloat((totalAmountForDb / data.numberOfInstallments).toFixed(2));
           let sumOfInstallments = 0;
 
@@ -116,13 +119,13 @@ export default function TransactionsPage() {
 
             const startDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
             const transactionDate = new Date(startDate.setMonth(startDate.getMonth() + i));
-
+            
             const installmentDescription = `${data.description} (Parcela ${i + 1}/${data.numberOfInstallments})`;
 
             const newInstallmentData: Omit<Transaction, 'id' | 'userId'> = {
               date: transactionDate,
               description: installmentDescription,
-              amount: -currentInstallmentAmount,
+              amount: -currentInstallmentAmount, // Valor da parcela individual
               type: 'expense',
               category: data.category,
               tags: data.tags,
@@ -130,7 +133,7 @@ export default function TransactionsPage() {
               installmentNumber: i + 1,
               totalInstallments: data.numberOfInstallments,
               originalPurchaseId: originalPurchaseId,
-              totalPurchaseAmount: totalAmountForDb,
+              totalPurchaseAmount: totalAmountForDb, // Valor total da compra original
             };
             await addTransaction(newInstallmentData);
           }
@@ -203,6 +206,49 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!transactions || transactions.length === 0) {
+      toast({
+        title: "Nenhuma transação para exportar",
+        description: "Adicione algumas transações antes de exportar.",
+      });
+      return;
+    }
+
+    const header = [
+      "Data", "Descrição", "Categoria", "Tipo", "Valor (R$)", "Tags",
+      "É Parcela?", "Parcela Nº", "Total Parcelas", "ID Compra Original", "Valor Total Compra (R$)"
+    ];
+
+    const rows = transactions.map(t => {
+      const categoryDetails = CATEGORIES_MAP.get(t.category);
+      return [
+        format(t.date, "MM/yyyy", { locale: ptBR }), // Data da transação/parcela
+        t.description.replace(/,/g, ';'), // Evitar problemas com vírgula na descrição
+        categoryDetails?.name || t.category,
+        t.type === 'income' ? 'Receita' : 'Despesa',
+        t.amount.toFixed(2).replace('.', ','), // Valor da transação/parcela
+        t.tags.join(' | '),
+        t.isInstallment ? 'Sim' : 'Não',
+        t.isInstallment && t.installmentNumber ? t.installmentNumber : '',
+        t.isInstallment && t.totalInstallments ? t.totalInstallments : '',
+        t.isInstallment && t.originalPurchaseId ? t.originalPurchaseId : '',
+        t.isInstallment && t.totalPurchaseAmount ? t.totalPurchaseAmount.toFixed(2).replace('.', ',') : ''
+      ].join(',');
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + header.join(',') + "\n" + rows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `transacoes_fluxofacil_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+    document.body.appendChild(link); 
+    link.click();
+    document.body.removeChild(link);
+
+    toast({ title: "Exportação Concluída", description: "Suas transações foram exportadas para CSV." });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -210,9 +256,14 @@ export default function TransactionsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
           <p className="text-muted-foreground">Gerencie suas receitas e despesas, incluindo compras parceladas.</p>
         </div>
-        <Button onClick={openFormForNew} className="shadow-md" disabled={isSubmitting}>
-          <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
-        </Button>
+        <div className="flex items-center space-x-2">
+            <Button onClick={handleExportCSV} variant="outline" className="shadow-md" disabled={isSubmitting || isLoading || transactions.length === 0}>
+                <Download className="mr-2 h-5 w-5" /> Exportar CSV
+            </Button>
+            <Button onClick={openFormForNew} className="shadow-md" disabled={isSubmitting}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
+            </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -268,3 +319,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays, Loader2, PieChart as PieChartIcon } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, List, CalendarDays, Loader2, PieChart as PieChartIcon, BarChart2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES_MAP } from '@/lib/constants';
 import type { Transaction } from '@/lib/types';
@@ -19,7 +19,7 @@ import { getTransactions } from '@/lib/firebase/firestoreService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
-import { PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -40,10 +40,7 @@ const months = [
 
 const getInitialFilterDate = () => {
   const currentDate = new Date();
-  currentDate.setMonth(currentDate.getMonth() + 1); // Avança para o próximo mês
-  // Garante que o dia não cause problemas ao mudar de mês (ex: 31 de Jan + 1 mês não vira 3 de Mar)
-  // Para seleção de mês/ano, isso é menos crítico, mas é uma boa prática.
-  // getMonth() é 0-indexado, por isso +1
+  currentDate.setMonth(currentDate.getMonth() + 1);
   const nextMonth = currentDate.getMonth() + 1;
   const yearForNextMonth = currentDate.getFullYear();
   return {
@@ -71,6 +68,12 @@ export default function DashboardPage() {
 
   const [pieChartData, setPieChartData] = useState<any[]>([]);
   const [pieChartConfig, setPieChartConfig] = useState<ChartConfig>({});
+
+  const [monthlySummaryData, setMonthlySummaryData] = useState<any[]>([]);
+  const monthlySummaryChartConfig = {
+    receitas: { label: "Receitas", color: "hsl(var(--chart-2))" },
+    despesas: { label: "Despesas", color: "hsl(var(--chart-1))" },
+  } satisfies ChartConfig;
 
 
   useEffect(() => {
@@ -116,6 +119,7 @@ export default function DashboardPage() {
       setCurrentTotalIncome(0);
       setCurrentTotalExpenses(0);
       setCurrentBalance(0);
+      setMonthlySummaryData([]);
       return;
     }
 
@@ -139,13 +143,37 @@ export default function DashboardPage() {
     setCurrentTotalIncome(newTotalIncome);
     setCurrentTotalExpenses(newTotalExpenses); 
     setCurrentBalance(newTotalIncome + newTotalExpenses);
+
+    // Calculate monthly summary for the last 6 months including the selected month
+    const summaryData = [];
+    const baseDateForSummary = new Date(yearToFilter, monthToFilter - 1, 1); // Use selected month/year as the most recent for summary
+    for (let i = 5; i >= 0; i--) {
+      const targetDate = subMonths(baseDateForSummary, i);
+      const month = getMonth(targetDate) + 1;
+      const year = getYear(targetDate);
+
+      const monthlyTransactions = allTransactions.filter(t => {
+        const tDate = t.date;
+        return tDate.getUTCMonth() + 1 === month && tDate.getUTCFullYear() === year;
+      });
+
+      const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      
+      summaryData.push({
+        name: format(targetDate, 'MMM/yy', { locale: ptBR }),
+        receitas: income,
+        despesas: expenses,
+      });
+    }
+    setMonthlySummaryData(summaryData);
+
   }, [allTransactions, selectedMonth, selectedYear, isLoading]);
 
 
   useEffect(() => {
-    // Filtra quando os dados são carregados ou quando os filtros (mês/ano) mudam
     if (!isClient || isLoading) {
-      return; // Não faz nada se não for client-side ou se estiver carregando
+      return;
     }
     applyFiltersAndRecalculate();
   }, [isClient, isLoading, allTransactions, selectedMonth, selectedYear, applyFiltersAndRecalculate]);
@@ -251,7 +279,49 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">R${currentBalance.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Saldo atual filtrado</p>
+            <p className="text-xs text-muted-foreground">Saldo atual do período selecionado</p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
+         <Card className="transition-all duration-300 ease-in-out hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart2 className="h-5 w-5 mr-2 text-primary" />
+              Receitas vs. Despesas (Últimos 6 Meses)
+            </CardTitle>
+            <CardDescription>Comparativo mensal de receitas e despesas.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[350px] p-4">
+            {monthlySummaryData.length > 0 ? (
+              <ChartContainer config={monthlySummaryChartConfig} className="h-full w-full">
+                <RechartsBarChart data={monthlySummaryData} accessibilityLayer>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    tickFormatter={(value) => value.slice(0, 3)}
+                  />
+                  <YAxis 
+                    tickFormatter={(value) => `R$${value/1000}k`}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <RechartsLegend />
+                  <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
+                  <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
+                </RechartsBarChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <BarChart2 className="h-16 w-16 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  {(!user && !isLoading) ? "Faça login para ver o resumo." : "Nenhum dado para exibir no resumo mensal."}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -267,7 +337,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.map((transaction) => {
+              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.slice(0, 5).map((transaction) => { // Limitar a 5 transações
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const transactionDate = transaction.date;
                 return (
@@ -275,7 +345,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="font-medium">{transaction.description}</p>
                     <p className="text-sm text-muted-foreground">
-                      {categoryDetails?.name || transaction.category} - {isClient ? format(transactionDate, 'MMMM/yyyy', { locale: ptBR }) : '...'}
+                      {categoryDetails?.name || transaction.category} - {isClient ? format(transactionDate, 'dd/MM/yyyy', { locale: ptBR }) : '...'}
                     </p>
                   </div>
                   <p className={`font-semibold ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -305,7 +375,7 @@ export default function DashboardPage() {
                 <RechartsPieChart accessibilityLayer>
                   <ChartTooltip
                     cursor={false}
-                    content={<ChartTooltipContent hideLabel nameKey="name" indicator="dot" />}
+                    content={<ChartTooltipContent hideLabel indicator="dot" />}
                   />
                   <Pie
                     data={pieChartData}
@@ -337,4 +407,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
