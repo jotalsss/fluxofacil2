@@ -206,6 +206,14 @@ export default function TransactionsPage() {
     }
   };
 
+  const escapeCsvCell = (cellData: any): string => {
+    let cell = cellData === null || cellData === undefined ? '' : String(cellData);
+    // Se a célula já contém aspas, elas precisam ser duplicadas
+    cell = cell.replace(/"/g, '""');
+    // Envolver a célula em aspas
+    return `"${cell}"`;
+  };
+
   const handleExportCSV = () => {
     if (!transactions || transactions.length === 0) {
       toast({
@@ -223,21 +231,21 @@ export default function TransactionsPage() {
     const rows = transactions.map(t => {
       const categoryDetails = CATEGORIES_MAP.get(t.category);
       return [
-        format(t.date, "MM/yyyy", { locale: ptBR }), // Data da transação/parcela
-        t.description.replace(/,/g, ';'), // Evitar problemas com vírgula na descrição
-        categoryDetails?.name || t.category,
-        t.type === 'income' ? 'Receita' : 'Despesa',
-        t.amount.toFixed(2).replace('.', ','), // Valor da transação/parcela
-        t.tags.join(' | '),
-        t.isInstallment ? 'Sim' : 'Não',
-        t.isInstallment && t.installmentNumber ? t.installmentNumber : '',
-        t.isInstallment && t.totalInstallments ? t.totalInstallments : '',
-        t.isInstallment && t.originalPurchaseId ? t.originalPurchaseId : '',
-        t.isInstallment && t.totalPurchaseAmount ? t.totalPurchaseAmount.toFixed(2).replace('.', ',') : ''
+        escapeCsvCell(format(t.date, "MM/yyyy", { locale: ptBR })),
+        escapeCsvCell(t.description),
+        escapeCsvCell(categoryDetails?.name || t.category),
+        escapeCsvCell(t.type === 'income' ? 'Receita' : 'Despesa'),
+        escapeCsvCell(t.amount.toFixed(2).replace('.', ',')), 
+        escapeCsvCell(t.tags.join(' | ')),
+        escapeCsvCell(t.isInstallment ? 'Sim' : 'Não'),
+        escapeCsvCell(t.isInstallment && t.installmentNumber ? t.installmentNumber : ''),
+        escapeCsvCell(t.isInstallment && t.totalInstallments ? t.totalInstallments : ''),
+        escapeCsvCell(t.isInstallment && t.originalPurchaseId ? t.originalPurchaseId : ''),
+        escapeCsvCell(t.isInstallment && t.totalPurchaseAmount ? t.totalPurchaseAmount.toFixed(2).replace('.', ',') : '')
       ].join(',');
     });
 
-    const csvContent = "data:text/csv;charset=utf-8," + header.join(',') + "\n" + rows.join("\n");
+    const csvContent = "\ufeff" + header.map(escapeCsvCell).join(',') + "\n" + rows.join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
