@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -96,10 +97,18 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
             const categoryDetails = CATEGORIES_MAP.get(transaction.category);
             const CategoryIcon = categoryDetails?.icon;
 
-            const displayDescription = transaction.description;
-
+            let displayDescription = transaction.description;
+            if (transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments) {
+              displayDescription = `${transaction.description} (Parcela ${transaction.installmentNumber}/${transaction.totalInstallments})`;
+            }
+            
             return (
-              <TableRow key={transaction.id}>
+              <TableRow 
+                key={transaction.id} 
+                className={cn(
+                  "border-b transition-all duration-150 ease-out hover:bg-muted/50 hover:shadow-md hover:-translate-y-px data-[state=selected]:bg-muted"
+                )}
+              >
                 <TableCell>{format(transaction.date, "MMMM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="font-medium">
                   {displayDescription}

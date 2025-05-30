@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES_MAP } from '@/lib/constants';
 import type { Transaction } from '@/lib/types';
@@ -39,13 +39,10 @@ const months = [
 ];
 
 const getInitialFilterDate = () => {
-  const currentDate = new Date();
-  currentDate.setMonth(currentDate.getMonth() + 1);
-  const nextMonth = currentDate.getMonth() + 1;
-  const yearForNextMonth = currentDate.getFullYear();
+  const nextMonthDate = addMonths(new Date(), 1);
   return {
-    month: String(nextMonth),
-    year: String(yearForNextMonth),
+    month: String(getMonth(nextMonthDate) + 1), // getMonth is 0-indexed
+    year: String(getYear(nextMonthDate)),
   };
 };
 
@@ -146,7 +143,7 @@ export default function DashboardPage() {
 
     // Calculate monthly summary for the last 6 months including the selected month
     const summaryData = [];
-    const baseDateForSummary = new Date(yearToFilter, monthToFilter - 1, 1); // Use selected month/year as the most recent for summary
+    const baseDateForSummary = new Date(yearToFilter, monthToFilter - 1, 1); 
     for (let i = 5; i >= 0; i--) {
       const targetDate = subMonths(baseDateForSummary, i);
       const month = getMonth(targetDate) + 1;
@@ -285,7 +282,7 @@ export default function DashboardPage() {
       </div>
       
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
-         <Card className="transition-all duration-300 ease-in-out hover:shadow-lg">
+         <Card className="transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart2 className="h-5 w-5 mr-2 text-primary" />
@@ -327,7 +324,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
           <CardHeader>
             <CardTitle className="flex items-center">
               <List className="h-5 w-5 mr-2 text-primary" />
@@ -337,11 +334,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.slice(0, 5).map((transaction) => { // Limitar a 5 transações
+              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.slice(0, 5).map((transaction) => { 
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const transactionDate = transaction.date;
                 return (
-                <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60">
+                <li key={transaction.id} className="flex justify-between items-center p-3 bg-secondary/30 rounded-md shadow-sm transition-all duration-200 ease-in-out hover:bg-secondary/60 hover:scale-[1.01] hover:-translate-y-px">
                   <div>
                     <p className="font-medium">{transaction.description}</p>
                     <p className="text-sm text-muted-foreground">
@@ -361,7 +358,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg flex flex-col">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center">
               <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
