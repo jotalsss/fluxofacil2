@@ -14,6 +14,7 @@ import {
   Gift, 
   HelpingHand,
   CircleDollarSign,
+  Repeat, // Ícone para Assinaturas
   Tag
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'housing', name: 'Moradia', icon: Home },
   { id: 'transportation', name: 'Transporte', icon: Car },
   { id: 'utilities', name: 'Contas Fixas', icon: CircleDollarSign }, // Example: Water, Electricity, Internet
+  { id: 'subscriptions', name: 'Assinaturas', icon: Repeat }, // Nova categoria
   { id: 'clothing', name: 'Vestuário', icon: Shirt },
   { id: 'entertainment', name: 'Entretenimento', icon: Film },
   { id: 'health_wellness', name: 'Saúde e Bem-estar', icon: HeartPulse },
