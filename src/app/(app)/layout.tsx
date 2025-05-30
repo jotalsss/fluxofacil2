@@ -49,12 +49,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   if (loading || !isAuthenticated) {
-    // Você pode mostrar um loader aqui ou null, pois o useEffect fará o redirect
-    // Para evitar piscar a tela, pode-se mostrar um loader mais persistente ou
-    // o AuthProvider já mostra um loader global.
     return (
         <div className="flex justify-center items-center min-h-screen bg-background">
-            <Menu className="h-12 w-12 animate-spin text-primary" /> {/* Usando Menu como placeholder de loader */}
+            <Menu className="h-12 w-12 animate-spin text-primary" />
         </div>
     );
   }
@@ -83,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <NextLink key={item.label} href={item.href} legacyBehavior passHref>
                   <a
                     className={cn(
-                      "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                      "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
                       isActive
                         ? "bg-primary/10 text-primary shadow-sm"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
