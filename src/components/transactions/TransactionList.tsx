@@ -30,14 +30,14 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
 
     const sortedTransactions = React.useMemo(() => {
         let sortableItems = [...transactions];
-        if (sortConfig !== null && sortConfig.key) { 
+        if (sortConfig !== null && sortConfig.key) {
           sortableItems.sort((a, b) => {
             const valA = a[sortConfig.key!];
             const valB = b[sortConfig.key!];
 
             if (valA === null || valA === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
             if (valB === null || valB === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
-            
+
             if (valA < valB) {
               return sortConfig.direction === 'ascending' ? -1 : 1;
             }
@@ -64,7 +64,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
         }
         return sortConfig.direction === 'ascending' ? '🔼' : '🔽';
     };
-  
+
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10">
@@ -95,7 +95,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
           {sortedTransactions.map((transaction) => {
             const categoryDetails = CATEGORIES_MAP.get(transaction.category);
             const CategoryIcon = categoryDetails?.icon;
-            
+
             const displayDescription = transaction.description;
 
             return (
@@ -112,10 +112,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                        </TooltipTrigger>
                        <TooltipContent side="top">
                          <p>
-                           {transaction.category === 'subscriptions' 
-                             ? `Valor mensal: R$ ${(transaction.totalPurchaseAmount / (transaction.totalInstallments || 1)).toFixed(2)}`
-                             : `Valor total da compra original: R$ ${transaction.totalPurchaseAmount.toFixed(2)}`
-                           }
+                           Valor total da compra original: R$ {transaction.totalPurchaseAmount.toFixed(2)}
                          </p>
                        </TooltipContent>
                      </Tooltip>
@@ -151,7 +148,7 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                         {transaction.isInstallment ? "Editar (Detalhes)" : "Editar"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onDelete(transaction.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {transaction.isInstallment ? (transaction.category === 'subscriptions' ? 'Mensalidade' : 'Parcela') : ""}
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {transaction.isInstallment ? 'Parcela' : ""}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -165,4 +162,3 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
     </TooltipProvider>
   );
 }
-
