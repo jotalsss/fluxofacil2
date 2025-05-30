@@ -246,9 +246,9 @@ export default function TransactionsPage() {
     });
 
     const csvContent = "\ufeff" + header.map(escapeCsvCell).join(',') + "\n" + rows.join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", dataUri);
     link.setAttribute("download", `transacoes_fluxofacil_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
     document.body.appendChild(link); 
     link.click();
