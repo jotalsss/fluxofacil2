@@ -14,7 +14,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -94,11 +93,11 @@ interface TransactionFormProps {
   onClose: () => void;
 }
 
-const getInitialDateForForm = () => {
+const getNextMonthYear = () => {
   const currentDate = new Date();
   currentDate.setMonth(currentDate.getMonth() + 1);
   return {
-    month: String(currentDate.getMonth() + 1),
+    month: String(currentDate.getMonth() + 1), // getMonth is 0-indexed, +1 for 1-indexed month
     year: String(currentDate.getFullYear()),
   };
 };
@@ -108,7 +107,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   const [calculatedInstallmentAmount, setCalculatedInstallmentAmount] = useState<number | null>(null);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 
-  const defaultNewTransactionDate = getInitialDateForForm();
+  const defaultNewTransactionDate = getNextMonthYear();
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -118,7 +117,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       description: initialData?.description || "",
       amount: initialData?.isInstallment && initialData.totalPurchaseAmount
                 ? Math.abs(initialData.totalPurchaseAmount)
-                : (initialData?.amount ? Math.abs(initialData.amount) : ""),
+                : (initialData?.amount ? String(Math.abs(initialData.amount)) : ""),
       type: initialData?.type || "expense",
       category: initialData?.category || "",
       tags: initialData?.tags?.join(", ") || "",
@@ -143,6 +142,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
 
   useEffect(() => {
     const isEditingInstallment = !!initialData?.isInstallment;
+    const nextMonthDate = getNextMonthYear();
 
     let monthToSet: string;
     let yearToSet: string;
@@ -151,25 +151,20 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       monthToSet = String(initialData.date.getUTCMonth() + 1);
       yearToSet = String(initialData.date.getUTCFullYear());
     } else {
-      const nextMonthDate = getInitialDateForForm();
       monthToSet = nextMonthDate.month;
       yearToSet = nextMonthDate.year;
     }
 
     let amountToSet: string | number = "";
      if (initialData) {
-        // If it's an installment and we have totalPurchaseAmount, use that for the form (as total)
         if (initialData.isInstallment && initialData.totalPurchaseAmount) {
             amountToSet = Math.abs(initialData.totalPurchaseAmount);
-        } else if (initialData.amount) { // Otherwise, use the transaction's own amount
+        } else if (initialData.amount) { 
             amountToSet = Math.abs(initialData.amount);
         }
     }
 
-
-    const installmentsToSet = initialData
-      ? (initialData.totalInstallments ? String(initialData.totalInstallments) : "")
-      : "";
+    const installmentsToSet = initialData?.totalInstallments ? String(initialData.totalInstallments) : "";
 
     let descriptionToSet = initialData?.description || "";
     if (isEditingInstallment && initialData) {
@@ -177,12 +172,11 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
         descriptionToSet = initialData.description.replace(pattern, '');
     }
 
-
     form.reset({
         month: monthToSet,
         year: yearToSet,
         description: descriptionToSet,
-        amount: amountToSet === "" ? "" : Number(amountToSet), // Ensure number or empty string for react-hook-form
+        amount: amountToSet === "" ? "" : Number(amountToSet),
         type: initialData?.type || "expense",
         category: initialData?.category || "",
         tags: initialData?.tags?.join(", ") || "",
@@ -229,31 +223,34 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
               <FormItem className="space-y-3">
                 <FormLabel>Tipo de Transação</FormLabel>
                 <FormControl>
-                  <RadioGroup
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      if (value === 'income') {
-                        form.setValue("isInstallmentPurchase", false);
-                        form.setValue("numberOfInstallments", undefined); // Use undefined for optional number
-                      }
-                    }}
-                    value={field.value}
-                    className="flex space-x-4"
-                    disabled={isEditingThisInstallment}
-                  >
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="income" />
-                      </FormControl>
-                      <FormLabel className={cn("font-normal", isEditingThisInstallment && "text-muted-foreground")}>Receita</FormLabel>
-                    </FormItem>
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="expense" />
-                      </FormControl>
-                      <FormLabel className={cn("font-normal", isEditingThisInstallment && "text-muted-foreground")}>Despesa</FormLabel>
-                    </FormItem>
-                  </RadioGroup>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                        type="button"
+                        variant={field.value === 'income' ? 'default' : 'outline'}
+                        onClick={() => {
+                        if (isEditingThisInstallment) return;
+                        field.onChange('income');
+                        form.setValue("isInstallmentPurchase", false, {shouldValidate: true});
+                        form.setValue("numberOfInstallments", undefined);
+                        }}
+                        disabled={isEditingThisInstallment}
+                        className="w-full"
+                    >
+                        Receita
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={field.value === 'expense' ? 'default' : 'outline'}
+                        onClick={() => {
+                          if (isEditingThisInstallment) return;
+                          field.onChange('expense');
+                        }}
+                        disabled={isEditingThisInstallment}
+                        className="w-full"
+                    >
+                        Despesa
+                    </Button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -360,7 +357,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
               <FormItem>
                 <FormLabel>Número de Parcelas</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder={"Ex: 12"} {...field} min="2" />
+                  <Input type="number" placeholder={"Ex: 12"} {...field} min="2" value={field.value ?? ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -478,3 +475,5 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
     </TooltipProvider>
   );
 }
+
+    
