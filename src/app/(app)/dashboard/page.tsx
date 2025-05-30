@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { format, subMonths, getMonth, getYear, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES_MAP } from '@/lib/constants';
 import type { Transaction } from '@/lib/types';
@@ -19,7 +19,7 @@ import { getTransactions } from '@/lib/firebase/firestoreService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
-import { PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Legend as RechartsLegend } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -104,6 +104,7 @@ export default function DashboardPage() {
     if (isClient && user) { 
       fetchAndSetTransactions();
     } else if (!user && isClient) {
+      // Se não há usuário e o cliente está pronto, para o loading e limpa as transações.
       setIsLoading(false); 
       setAllTransactions([]);
     }
@@ -111,7 +112,7 @@ export default function DashboardPage() {
 
 
   const applyFiltersAndRecalculate = useCallback(() => {
-    if (!allTransactions.length && !isLoading) { 
+    if (!allTransactions.length && !isLoading) { // Adicionado !isLoading para evitar recalcular com lista vazia durante o carregamento
       setFilteredTransactions([]);
       setCurrentTotalIncome(0);
       setCurrentTotalExpenses(0);
@@ -124,7 +125,7 @@ export default function DashboardPage() {
     const yearToFilter = parseInt(selectedYear, 10);
 
     const newFilteredTransactions = allTransactions.filter(transaction => {
-      const transactionDate = transaction.date; 
+      const transactionDate = transaction.date; // Já é um objeto Date
       return transactionDate.getUTCMonth() + 1 === monthToFilter && transactionDate.getUTCFullYear() === yearToFilter;
     });
 
@@ -135,15 +136,15 @@ export default function DashboardPage() {
       .reduce((sum, t) => sum + t.amount, 0);
     const newTotalExpenses = newFilteredTransactions
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0); 
+      .reduce((sum, t) => sum + t.amount, 0); // Despesas são negativas, então a soma direta funciona
 
     setCurrentTotalIncome(newTotalIncome);
     setCurrentTotalExpenses(newTotalExpenses); 
-    setCurrentBalance(newTotalIncome + newTotalExpenses);
+    setCurrentBalance(newTotalIncome + newTotalExpenses); // Soma direta, pois despesas são negativas
 
     // Calculate monthly summary for the last 6 months including the selected month
     const summaryData = [];
-    const baseDateForSummary = new Date(yearToFilter, monthToFilter - 1, 1); 
+    const baseDateForSummary = new Date(yearToFilter, monthToFilter - 1, 1); // Usa o mês/ano selecionado como base
     for (let i = 5; i >= 0; i--) {
       const targetDate = subMonths(baseDateForSummary, i);
       const month = getMonth(targetDate) + 1;
@@ -155,6 +156,7 @@ export default function DashboardPage() {
       });
 
       const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      // Para o gráfico de barras, queremos o valor positivo da despesa
       const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
       
       summaryData.push({
@@ -169,7 +171,9 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    if (!isClient || isLoading) {
+    // Este useEffect agora dispara a filtragem quando os dados ou filtros mudam
+    // e o componente está montado no cliente e não está mais carregando inicialmente.
+    if (!isClient || isLoading) { // Não filtra se não for cliente ou se ainda estiver carregando dados brutos
       return;
     }
     applyFiltersAndRecalculate();
@@ -177,6 +181,7 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
+    // Gera dados para o gráfico de pizza quando as transações filtradas mudam
     if (filteredTransactions.length > 0) {
       const expenseByCategory = filteredTransactions
         .filter(t => t.type === 'expense')
@@ -186,19 +191,20 @@ export default function DashboardPage() {
           const currentAmount = acc[categoryId]?.value || 0;
           acc[categoryId] = {
             name: categoryName,
-            value: currentAmount + Math.abs(transaction.amount),
-            id: categoryId,
+            value: currentAmount + Math.abs(transaction.amount), // Usar valor absoluto para o gráfico
+            id: categoryId, // Usar o ID da categoria para a cor
           };
           return acc;
         }, {} as Record<string, { name: string, value: number, id: string }>);
   
-      const chartData = Object.values(expenseByCategory).sort((a,b) => b.value - a.value); 
+      const chartData = Object.values(expenseByCategory).sort((a,b) => b.value - a.value); // Ordenar para consistência de cores
       setPieChartData(chartData);
   
+      // Gerar configuração de cores para o gráfico de pizza
       const newChartConfig = chartData.reduce((config, item, index) => {
-        config[item.id] = {
+        config[item.id] = { // Usar o ID da categoria como chave para a cor
           label: item.name,
-          color: `hsl(var(--chart-${(index % 5) + 1}))`, 
+          color: `hsl(var(--chart-${(index % 5) + 1}))`, // Cicla por 5 cores do tema
         };
         return config;
       }, {} as ChartConfig);
@@ -211,7 +217,7 @@ export default function DashboardPage() {
   }, [filteredTransactions]);
 
 
-  if (isLoading && isClient && user) { 
+  if (isLoading && isClient && user) { // Mostra loader apenas se logado e carregando
     return (
       <div className="flex flex-col justify-center items-center h-64 space-y-2">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -281,7 +287,7 @@ export default function DashboardPage() {
         </Card>
       </div>
       
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-1"> {/* Ajustado para ocupar a linha toda */}
          <Card className="transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -300,10 +306,10 @@ export default function DashboardPage() {
                     tickLine={false}
                     tickMargin={10}
                     axisLine={false}
-                    tickFormatter={(value) => value.slice(0, 3)}
+                    tickFormatter={(value) => value.slice(0, 3)} // Ex: "Jan/24"
                   />
                   <YAxis 
-                    tickFormatter={(value) => `R$${value/1000}k`}
+                    tickFormatter={(value) => `R$${value/1000}k`} // Formata para milhares (ex: R$10k)
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <RechartsLegend />
@@ -334,7 +340,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.slice(0, 5).map((transaction) => { 
+              {(!isLoading && filteredTransactions.length > 0) ? filteredTransactions.slice(0, 5).map((transaction) => { // Limita a 5 transações
                 const categoryDetails = CATEGORIES_MAP.get(transaction.category);
                 const transactionDate = transaction.date;
                 return (
@@ -366,7 +372,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Representação visual dos seus hábitos de consumo por categoria.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center p-4">
+          <CardContent className="flex-1 flex items-center justify-center p-4"> {/* Garante que o conteúdo do gráfico possa crescer */}
             {pieChartData.length > 0 ? (
               <ChartContainer config={pieChartConfig} className="h-[300px] w-full">
                 <RechartsPieChart accessibilityLayer>
@@ -377,11 +383,12 @@ export default function DashboardPage() {
                   <Pie
                     data={pieChartData}
                     dataKey="value"
-                    nameKey="name" 
+                    nameKey="name" // Usado pela legenda e tooltip para identificar a fatia
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={100} // Ajuste conforme necessário
                     labelLine={false}
+                    // label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} // Exemplo de label na fatia
                   >
                     {pieChartData.map((entry) => (
                       <Cell key={`cell-${entry.id}`} fill={`var(--color-${entry.id})`} />
