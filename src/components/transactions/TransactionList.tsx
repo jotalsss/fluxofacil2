@@ -96,7 +96,6 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
             const categoryDetails = CATEGORIES_MAP.get(transaction.category);
             const CategoryIcon = categoryDetails?.icon;
             
-            // Descrição já vem formatada do firestoreService para parcelas
             const displayDescription = transaction.description;
 
             return (
@@ -112,7 +111,12 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                          </button>
                        </TooltipTrigger>
                        <TooltipContent side="top">
-                         <p>Valor total da compra original: R$ {transaction.totalPurchaseAmount.toFixed(2)}</p>
+                         <p>
+                           {transaction.category === 'subscriptions' 
+                             ? `Valor mensal: R$ ${(transaction.totalPurchaseAmount / (transaction.totalInstallments || 1)).toFixed(2)}`
+                             : `Valor total da compra original: R$ ${transaction.totalPurchaseAmount.toFixed(2)}`
+                           }
+                         </p>
                        </TooltipContent>
                      </Tooltip>
                   )}
@@ -142,11 +146,12 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(transaction)} disabled={transaction.isInstallment}>
-                        <Edit2 className="mr-2 h-4 w-4" /> {transaction.isInstallment ? "Editar (Limitado)" : "Editar"}
+                      <DropdownMenuItem onClick={() => onEdit(transaction)} >
+                        <Edit2 className="mr-2 h-4 w-4" />
+                        {transaction.isInstallment ? "Editar (Detalhes)" : "Editar"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onDelete(transaction.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {transaction.isInstallment ? "Parcela" : ""}
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {transaction.isInstallment ? (transaction.category === 'subscriptions' ? 'Mensalidade' : 'Parcela') : ""}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -160,3 +165,4 @@ export function TransactionList({ transactions, onEdit, onDelete, onAddTransacti
     </TooltipProvider>
   );
 }
+

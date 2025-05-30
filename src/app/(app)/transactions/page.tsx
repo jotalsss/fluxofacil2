@@ -80,49 +80,60 @@ export default function TransactionsPage() {
 
     try {
       if (data.id && editingTransaction) { 
-        if (editingTransaction.isInstallment) {
-            const updatedTransactionData: Partial<Transaction> = { 
-              description: data.description, 
-              category: data.category,
-              tags: data.tags,
-            };
-            await updateTransaction(data.id, updatedTransactionData); 
-            toast({ title: "Parcela atualizada!", description: `Detalhes da parcela "${data.description}" foram atualizados.` });
+        // Edição de transação existente (incluindo parcela/mensalidade individual)
+        const updatedTransactionData: Partial<Transaction> = { 
+          description: data.description, 
+          category: data.category,
+          tags: data.tags,
+        };
 
-        } else { 
+        // Para parcelas/mensalidades, não permitimos alterar valor, tipo, mês/ano diretamente aqui.
+        // Apenas descrição, categoria e tags são editáveis para uma parcela individual.
+        if (!editingTransaction.isInstallment) {
             const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
-            const updatedTransactionData: Omit<Transaction, 'id' | 'userId' | 'isInstallment' | 'installmentNumber' | 'totalInstallments' | 'originalPurchaseId' | 'totalPurchaseAmount'> = {
-              date: transactionDate,
-              description: data.description,
-              amount: data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
-              type: data.type,
-              category: data.category,
-              tags: data.tags,
-            };
-            await updateTransaction(data.id, updatedTransactionData);
-            toast({ title: "Transação atualizada!", description: `"${data.description}" foi atualizada.` });
+            updatedTransactionData.date = transactionDate;
+            updatedTransactionData.amount = data.type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount);
+            updatedTransactionData.type = data.type;
         }
+        
+        await updateTransaction(data.id, updatedTransactionData); 
+        toast({ title: "Transação atualizada!", description: `"${data.description}" foi atualizada.` });
+
       } else { 
+        // Adição de nova transação
         if (data.isInstallmentPurchase && data.numberOfInstallments && data.numberOfInstallments >= 2 && data.type === 'expense') {
           const originalPurchaseId = uuidv4();
-          const totalAmount = Math.abs(data.amount); 
-          const baseInstallmentAmount = parseFloat((totalAmount / data.numberOfInstallments).toFixed(2));
+          const isSubscription = data.category === 'subscriptions';
+          
+          let monthlyAmount: number;
+          let totalAmountForDb: number;
+
+          if (isSubscription) {
+            monthlyAmount = Math.abs(data.amount);
+            totalAmountForDb = monthlyAmount * data.numberOfInstallments;
+          } else {
+            totalAmountForDb = Math.abs(data.amount);
+            monthlyAmount = parseFloat((totalAmountForDb / data.numberOfInstallments).toFixed(2)); // Valor base da parcela
+          }
           
           let sumOfInstallments = 0;
 
           for (let i = 0; i < data.numberOfInstallments; i++) {
             let currentInstallmentAmount;
-            if (i === data.numberOfInstallments - 1) {
-              currentInstallmentAmount = parseFloat((totalAmount - sumOfInstallments).toFixed(2));
-            } else {
-              currentInstallmentAmount = baseInstallmentAmount;
+            if (!isSubscription && i === data.numberOfInstallments - 1) { // Ajuste para última parcela de compra normal
+              currentInstallmentAmount = parseFloat((totalAmountForDb - sumOfInstallments).toFixed(2));
+            } else if (!isSubscription) {
+              currentInstallmentAmount = monthlyAmount;
+            } else { // Para assinaturas, o valor mensal é fixo
+              currentInstallmentAmount = monthlyAmount;
             }
-            sumOfInstallments += currentInstallmentAmount;
+
+            if(!isSubscription) sumOfInstallments += currentInstallmentAmount;
             
             const startDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
             const transactionDate = new Date(startDate.setMonth(startDate.getMonth() + i));
             
-            const installmentDescription = `${data.description} (Parcela ${i + 1}/${data.numberOfInstallments})`;
+            const installmentDescription = `${data.description} (${isSubscription ? 'Mês' : 'Parcela'} ${i + 1}/${data.numberOfInstallments})`;
             
             const newInstallmentData: Omit<Transaction, 'id' | 'userId'> = {
               date: transactionDate,
@@ -135,12 +146,13 @@ export default function TransactionsPage() {
               installmentNumber: i + 1,
               totalInstallments: data.numberOfInstallments,
               originalPurchaseId: originalPurchaseId,
-              totalPurchaseAmount: totalAmount, 
+              totalPurchaseAmount: totalAmountForDb, 
             };
             await addTransaction(newInstallmentData);
           }
-          toast({ title: "Compra parcelada adicionada!", description: `${data.numberOfInstallments} parcelas de "${data.description}" foram criadas.` });
+          toast({ title: `${isSubscription ? 'Assinatura' : 'Compra parcelada'} adicionada!`, description: `${data.numberOfInstallments} ${isSubscription ? 'mensalidades' : 'parcelas'} de "${data.description}" foram criadas.` });
         } else {
+          // Transação única
           const transactionDate = new Date(parseInt(data.year), parseInt(data.month) - 1, 1);
           const newTransactionData: Omit<Transaction, 'id' | 'userId'> = {
             date: transactionDate,
@@ -188,8 +200,9 @@ export default function TransactionsPage() {
     if (transactionToDelete) {
       setIsSubmitting(true);
       try {
+        const transactionBeingDeleted = transactions.find(t => t.id === transactionToDelete);
         await deleteTransaction(transactionToDelete);
-        toast({ title: "Transação excluída", description: "A transação foi excluída com sucesso." });
+        toast({ title: `Transação excluída`, description: `A ${transactionBeingDeleted?.isInstallment && transactionBeingDeleted?.category === 'subscriptions' ? 'mensalidade' : (transactionBeingDeleted?.isInstallment ? 'parcela' : 'transação')} foi excluída com sucesso.` });
         fetchTransactions(); 
         setTransactionToDelete(null);
       } catch (error) {
@@ -211,7 +224,7 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
-          <p className="text-muted-foreground">Gerencie suas receitas e despesas, incluindo compras parceladas.</p>
+          <p className="text-muted-foreground">Gerencie suas receitas e despesas, incluindo compras parceladas e assinaturas.</p>
         </div>
         <Button onClick={openFormForNew} className="shadow-md" disabled={isSubmitting}>
           <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
@@ -235,9 +248,9 @@ export default function TransactionsPage() {
       <Dialog open={isFormOpen} onOpenChange={(open) => { if(!open && !isSubmitting) { setIsFormOpen(false); setEditingTransaction(undefined); } else if(open) { setIsFormOpen(true); }}}>
         <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingTransaction ? (editingTransaction.isInstallment ? "Detalhes da Parcela" : "Editar Transação") : "Adicionar Nova Transação"}</DialogTitle>
+            <DialogTitle>{editingTransaction ? (editingTransaction.isInstallment ? `Detalhes da ${editingTransaction.category === 'subscriptions' ? 'Mensalidade' : 'Parcela'}` : "Editar Transação") : "Adicionar Nova Transação"}</DialogTitle>
             <DialogDescription>
-              {editingTransaction ? (editingTransaction.isInstallment ? "Visualizando detalhes da parcela. A edição completa de compras parceladas requer exclusão e recriação." : "Atualize os detalhes da sua transação.") : "Insira os detalhes da sua nova transação, incluindo opções de parcelamento para despesas."}
+              {editingTransaction ? (editingTransaction.isInstallment ? `Visualizando detalhes. A edição completa de compras parceladas/assinaturas requer exclusão e recriação.` : "Atualize os detalhes da sua transação.") : "Insira os detalhes da sua nova transação, incluindo opções de parcelamento para despesas ou configuração de assinaturas."}
             </DialogDescription>
           </DialogHeader>
           <TransactionForm
@@ -255,7 +268,7 @@ export default function TransactionsPage() {
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente a transação.
               {transactions.find(t => t.id === transactionToDelete)?.isInstallment && (
-                <span className="block mt-2 font-semibold text-yellow-400">Atenção: Esta é uma parcela. Excluir esta parcela não afetará as outras parcelas da mesma compra original.</span>
+                <span className="block mt-2 font-semibold text-yellow-400">Atenção: Esta é uma {transactions.find(t => t.id === transactionToDelete)?.category === 'subscriptions' ? 'mensalidade' : 'parcela'}. Excluir isto não afetará as outras ocorrências da mesma compra/assinatura original.</span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -271,3 +284,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+

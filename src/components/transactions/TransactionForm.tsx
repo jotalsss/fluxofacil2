@@ -63,7 +63,7 @@ const transactionFormSchema = z.object({
   }
   return true;
 }, {
-  message: "Número de parcelas é obrigatório para compra parcelada (despesa) e deve ser no mínimo 2.",
+  message: "Número de parcelas/meses é obrigatório para despesa recorrente/parcelada e deve ser no mínimo 2.",
   path: ["numberOfInstallments"],
 }).refine(data => {
     if (data.isInstallmentPurchase && data.type === 'income') {
@@ -71,7 +71,7 @@ const transactionFormSchema = z.object({
     }
     return true;
 }, {
-    message: "Não é possível parcelar receitas.",
+    message: "Não é possível parcelar/tornar recorrente receitas.",
     path: ["isInstallmentPurchase"],
 });
 
@@ -116,7 +116,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       month: initialData?.date ? String(initialData.date.getUTCMonth() + 1) : defaultNewTransactionDate.month,
       year: initialData?.date ? String(initialData.date.getUTCFullYear()) : defaultNewTransactionDate.year,
       description: initialData?.description || "",
-      amount: initialData?.isInstallment && initialData?.totalPurchaseAmount 
+      amount: initialData?.isInstallment && initialData?.totalPurchaseAmount && initialData.category !== 'subscriptions'
                 ? Math.abs(initialData.totalPurchaseAmount)
                 : (initialData?.amount ? Math.abs(initialData.amount) : ""),
       type: initialData?.type || "expense",
@@ -131,14 +131,17 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
   const watchAmount = form.watch("amount");
   const watchNumberOfInstallments = form.watch("numberOfInstallments");
   const watchType = form.watch("type");
+  const watchCategory = form.watch("category");
+
+  const isSubscriptionCategory = watchCategory === 'subscriptions';
 
   useEffect(() => {
-    if (watchIsInstallmentPurchase && watchType === 'expense' && Number(watchAmount) > 0 && Number(watchNumberOfInstallments) >= 2) {
+    if (watchIsInstallmentPurchase && watchType === 'expense' && !isSubscriptionCategory && Number(watchAmount) > 0 && Number(watchNumberOfInstallments) >= 2) {
       setCalculatedInstallmentAmount(Number(watchAmount) / Number(watchNumberOfInstallments));
     } else {
       setCalculatedInstallmentAmount(null);
     }
-  }, [watchIsInstallmentPurchase, watchAmount, watchNumberOfInstallments, watchType]);
+  }, [watchIsInstallmentPurchase, watchAmount, watchNumberOfInstallments, watchType, isSubscriptionCategory]);
   
   useEffect(() => {
     const isEditingInstallment = !!initialData?.isInstallment;
@@ -155,20 +158,37 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
       yearToSet = nextMonthDate.year;
     }
     
-    const amountToSet = initialData
-      ? (initialData.isInstallment && initialData.totalPurchaseAmount
-          ? Math.abs(initialData.totalPurchaseAmount)
-          : (initialData.amount ? Math.abs(initialData.amount) : ""))
-      : "";
+    let amountToSet: string | number = "";
+    if (initialData) {
+        if (initialData.isInstallment) {
+            if (initialData.category === 'subscriptions') {
+                amountToSet = initialData.amount ? Math.abs(initialData.amount) : ""; // For subscriptions, initialData.amount is monthly
+            } else if (initialData.totalPurchaseAmount) {
+                amountToSet = Math.abs(initialData.totalPurchaseAmount); // For other installments, it's total
+            } else {
+                amountToSet = initialData.amount ? Math.abs(initialData.amount) : "";
+            }
+        } else {
+           amountToSet = initialData.amount ? Math.abs(initialData.amount) : "";
+        }
+    }
+
 
     const installmentsToSet = initialData
       ? (initialData.totalInstallments ? String(initialData.totalInstallments) : "")
       : "";
 
+    let descriptionToSet = initialData?.description || "";
+    if (isEditingInstallment && initialData) {
+        const pattern = initialData.category === 'subscriptions' ? / \(Mês \d+\/\d+\)$/ : / \(Parcela \d+\/\d+\)$/;
+        descriptionToSet = initialData.description.replace(pattern, '');
+    }
+
+
     form.reset({
         month: monthToSet,
         year: yearToSet,
-        description: isEditingInstallment && initialData ? initialData.description.replace(/ \(Parcela \d+\/\d+\)$/, '') : initialData?.description || "",
+        description: descriptionToSet,
         amount: amountToSet,
         type: initialData?.type || "expense",
         category: initialData?.category || "",
@@ -303,7 +323,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Input placeholder="ex: Compra de Geladeira, Salário" {...field} disabled={isEditingThisInstallment && !initialData?.description.includes('(Parcela')} />
+                <Input placeholder="ex: Netflix, Compra de Geladeira, Salário" {...field} disabled={isEditingThisInstallment && initialData?.category !== 'subscriptions'} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -331,9 +351,9 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
               </FormControl>
               <div className="space-y-1 leading-none">
                 <FormLabel className={cn(isEditingThisInstallment && "text-muted-foreground")}>
-                  É uma compra parcelada?
+                  {isSubscriptionCategory ? "Lançar mensalmente (assinatura)?" : "É uma compra parcelada?"}
                 </FormLabel>
-                {isEditingThisInstallment && <p className="text-xs text-muted-foreground">Não é possível alterar o parcelamento de uma transação existente através da edição de uma parcela.</p>}
+                {isEditingThisInstallment && <p className="text-xs text-muted-foreground">Não é possível alterar o parcelamento/recorrência de uma transação existente através da edição de uma parcela/mês.</p>}
               </div>
             </FormItem>
           )}
@@ -345,9 +365,9 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             name="numberOfInstallments"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Número de Parcelas</FormLabel>
+                <FormLabel>{isSubscriptionCategory ? "Duração (meses)" : "Número de Parcelas"}</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="Ex: 12" {...field} min="2" />
+                  <Input type="number" placeholder={isSubscriptionCategory ? "Ex: 12 (meses)" : "Ex: 12"} {...field} min="2" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -360,7 +380,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
                 name="numberOfInstallments" 
                 render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Número de Parcelas (Total)</FormLabel>
+                    <FormLabel>{isSubscriptionCategory ? "Duração (meses)" : "Número de Parcelas (Total)"}</FormLabel>
                     <FormControl>
                     <Input type="number" {...field} disabled />
                     </FormControl>
@@ -377,8 +397,11 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="flex items-center">
-                  {watchIsInstallmentPurchase && watchType === 'expense' ? "Valor Total da Compra (R$)" : "Valor (R$)"}
-                   {watchIsInstallmentPurchase && watchType === 'expense' && (
+                  {watchIsInstallmentPurchase && watchType === 'expense'
+                    ? (isSubscriptionCategory ? "Valor Mensal da Assinatura (R$)" : "Valor Total da Compra (R$)")
+                    : "Valor (R$)"
+                  }
+                   {watchIsInstallmentPurchase && watchType === 'expense' && !isSubscriptionCategory && (
                      <Tooltip>
                        <TooltipTrigger asChild><button type="button" tabIndex={-1}><Info className="ml-1 h-3 w-3 text-muted-foreground cursor-help" /></button></TooltipTrigger>
                        <TooltipContent side="top"><p>Informe o valor total da compra. As parcelas serão calculadas.</p></TooltipContent>
@@ -393,14 +416,14 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             )}
           />
         
-         {watchIsInstallmentPurchase && calculatedInstallmentAmount !== null && watchType === 'expense' && !isEditingThisInstallment && (
+         {watchIsInstallmentPurchase && calculatedInstallmentAmount !== null && watchType === 'expense' && !isSubscriptionCategory && !isEditingThisInstallment && (
           <div className="mt-2 text-sm text-muted-foreground bg-secondary p-2 rounded-md">
             Valor de cada parcela: R$ {calculatedInstallmentAmount.toFixed(2)} (aproximadamente)
           </div>
         )}
          {isEditingThisInstallment && initialData?.amount && initialData.isInstallment && (
             <div className="mt-2 text-sm text-muted-foreground bg-secondary p-2 rounded-md">
-                Valor desta parcela: R$ {Math.abs(initialData.amount).toFixed(2)}
+                Valor desta {initialData.category === 'subscriptions' ? 'mensalidade' : 'parcela'}: R$ {Math.abs(initialData.amount).toFixed(2)}
             </div>
         )}
 
@@ -412,7 +435,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Categoria</FormLabel>
               <div className="flex items-center gap-2">
-                <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment && !initialData?.description.includes('(Parcela')}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isEditingThisInstallment && initialData?.category !== 'subscriptions'}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -442,7 +465,7 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <FormItem>
               <FormLabel>Tags (separadas por vírgula)</FormLabel>
               <FormControl>
-                <Input placeholder="ex: urgente, viagem, casa" {...field} />
+                <Input placeholder="ex: urgente, streaming, casa" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -453,10 +476,10 @@ export function TransactionForm({ onSubmit, initialData, onClose }: TransactionF
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmittingForm}>Cancelar</Button>
             <Button type="submit" disabled={isSubmittingForm || (isEditingThisInstallment && !initialData?.id) }>
               {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditingThisInstallment ? "Salvar Parcela" : (initialData?.id ? "Salvar Alterações" : "Salvar Transação")}
+              {isEditingThisInstallment ? "Salvar Alterações" : "Salvar Transação"}
             </Button>
         </div>
-        {isEditingThisInstallment && <p className="text-sm text-muted-foreground text-right pt-2">Edição de parcelas individuais permite alterar descrição, categoria e tags. Para alterar valor ou número de parcelas da compra original, exclua todas as parcelas e adicione a compra novamente.</p>}
+        {isEditingThisInstallment && <p className="text-sm text-muted-foreground text-right pt-2">Edição de parcelas/mensalidades individuais permite alterar descrição, categoria e tags. Para alterar valor ou número de meses/parcelas da compra original, exclua todas as ocorrências e adicione novamente.</p>}
       </form>
     </Form>
     </TooltipProvider>
